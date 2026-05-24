@@ -150,16 +150,17 @@ jobs:
             unzip -l app/build/outputs/bundle/release/app-release.aab | grep -E '\.so$' | head -5 || true
           fi
 
-      - name: Upload to Google Play
-        uses: r0adkll/upload-google-play@v1.1.3
-        with:
-          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
-          packageName: com.eazpire.creator.wear
-          releaseFiles: app/build/outputs/bundle/release/app-release.aab
-          # v1.1.3 only supports `track` (not `tracks`); must be wear:internal not production/phone internal
-          track: ${{ env.PLAY_TRACK }}
-          debugSymbols: ${{ steps.native_symbols.outputs.path }}
-          status: completed
+      - name: Upload to Google Play (wear track only)
+        env:
+          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          PLAY_TRACK: ${{ env.PLAY_TRACK }}
+        run: |
+          npm install --no-save googleapis@144
+          ARGS="--package com.eazpire.creator.wear --track $PLAY_TRACK --aab app/build/outputs/bundle/release/app-release.aab"
+          if [ -n "${{ steps.native_symbols.outputs.path }}" ]; then
+            ARGS="$ARGS --symbols ${{ steps.native_symbols.outputs.path }}"
+          fi
+          node scripts/upload-wear-play.js $ARGS
 
       - name: Prune Wear bundles from phone Play tracks
         env:
