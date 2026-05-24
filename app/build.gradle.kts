@@ -75,6 +75,14 @@ android {
     }
 }
 
+/** CI: same resolution as defaultConfig.versionCode (see google-play.yml Verify step). */
+tasks.register("printReleaseVersionCode") {
+    doLast {
+        val code = ciVersionCode.map { it.toInt() }.orElse(1).get()
+        println("VERSION_CODE_OUT=$code")
+    }
+}
+
 dependencies {
     implementation(project(":creator-core"))
 

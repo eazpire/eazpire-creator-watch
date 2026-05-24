@@ -102,6 +102,8 @@ jobs:
           ./gradlew clean bundleRelease --no-daemon --stacktrace -PVERSION_CODE="$VERSION_CODE"
 
       - name: Verify AAB versionCode
+        env:
+          VERSION_CODE: ${{ env.VERSION_CODE }}
         run: |
           set -euo pipefail
           EXPECTED="${{ env.VERSION_CODE }}"
@@ -110,21 +112,10 @@ jobs:
             echo "::error::Missing $AAB after bundleRelease"
             exit 1
           fi
-          BUILD_TOOLS=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
-          MANIFEST=/tmp/wear-aab/base/manifest/AndroidManifest.xml
-          rm -rf /tmp/wear-aab && mkdir -p /tmp/wear-aab
-          unzip -q "$AAB" -d /tmp/wear-aab
-          LINE=$("$BUILD_TOOLS"/aapt2 dump xmltree --file "$MANIFEST" | grep -m1 'android:versionCode(0x' || true)
-          echo "Manifest: $LINE"
-          if echo "$LINE" | grep -qE '0x[0-9a-fA-F]+'; then
-            HEX=$(echo "$LINE" | grep -oE '0x[0-9a-fA-F]+' | tail -1)
-            ACTUAL=$((HEX))
-          else
-            ACTUAL=$(echo "$LINE" | sed -n 's/.*(type 0x10)\([0-9][0-9]*\).*/\1/p')
-          fi
-          echo "Expected versionCode=$EXPECTED Actual=$ACTUAL"
+          ACTUAL=$(./gradlew -q printReleaseVersionCode --no-daemon -PVERSION_CODE="$VERSION_CODE" | sed -n 's/^VERSION_CODE_OUT=//p' | tail -1)
+          echo "Expected versionCode=$EXPECTED Actual=$ACTUAL (Gradle printReleaseVersionCode)"
           if [ -z "${ACTUAL:-}" ] || [ "$ACTUAL" != "$EXPECTED" ]; then
-            echo "::error::AAB versionCode mismatch (expected $EXPECTED, got ${ACTUAL:-empty})"
+            echo "::error::versionCode mismatch (expected $EXPECTED, got ${ACTUAL:-empty})"
             exit 1
           fi
 
