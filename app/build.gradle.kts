@@ -12,6 +12,10 @@ if (keystorePropertiesFile.exists()) {
     keystorePropertiesFile.inputStream().use { keystoreProperties.load(it) }
 }
 
+// CI: VERSION_CODE via env or -PVERSION_CODE (lazy — avoids configuration-cache sticking at 1).
+val ciVersionCode = providers.gradleProperty("VERSION_CODE")
+    .orElse(providers.environmentVariable("VERSION_CODE"))
+
 android {
     namespace = "com.eazpire.creator.wear"
     compileSdk = 35
@@ -23,9 +27,10 @@ android {
         applicationId = "com.eazpire.creator.wear"
         minSdk = 30
         targetSdk = 35
-        val appVersionCode = (System.getenv("VERSION_CODE") ?: "1").toIntOrNull() ?: 1
-        versionCode = appVersionCode
-        versionName = System.getenv("VERSION_NAME") ?: "1.0.0 ($appVersionCode)"
+        versionCode = ciVersionCode.map { it.toInt() }.orElse(1).get()
+        versionName = providers.environmentVariable("VERSION_NAME")
+            .orElse(ciVersionCode.map { "1.0.0 ($it)" })
+            .get()
     }
 
     signingConfigs {

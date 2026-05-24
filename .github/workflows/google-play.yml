@@ -86,7 +86,24 @@ jobs:
         env:
           CI: "true"
           VERSION_CODE: ${{ env.VERSION_CODE }}
-        run: ./gradlew bundleRelease --no-daemon --stacktrace
+        run: |
+          echo "Building with VERSION_CODE=$VERSION_CODE"
+          ./gradlew clean bundleRelease --no-daemon --stacktrace -PVERSION_CODE="$VERSION_CODE"
+
+      - name: Verify AAB versionCode
+        run: |
+          EXPECTED="${{ env.VERSION_CODE }}"
+          BUILD_TOOLS=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          rm -rf /tmp/wear-aab && mkdir -p /tmp/wear-aab
+          unzip -q app/build/outputs/bundle/release/app-release.aab -d /tmp/wear-aab
+          ACTUAL=$("$BUILD_TOOLS"/aapt2 dump xmltree /tmp/wear-aab/base/manifest/AndroidManifest.xml | awk '
+            /android:versionCode/ { getline; sub(/.*raw="/, ""); sub(/".*/, ""); print; exit }
+          ')
+          echo "Expected versionCode=$EXPECTED Actual=$ACTUAL"
+          if [ -z "$ACTUAL" ] || [ "$ACTUAL" != "$EXPECTED" ]; then
+            echo "::error::AAB versionCode mismatch (expected $EXPECTED, got ${ACTUAL:-empty})"
+            exit 1
+          fi
 
       - name: Resolve Wear Play track
         run: |
