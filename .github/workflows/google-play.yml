@@ -150,6 +150,7 @@ jobs:
           serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
           packageName: com.eazpire.creator.wear
           releaseFiles: app/build/outputs/bundle/release/app-release.aab
-          tracks: ${{ env.PLAY_TRACK }}
+          # v1.1.3 only supports `track` (not `tracks`); must be wear:internal not production/phone internal
+          track: ${{ env.PLAY_TRACK }}
           debugSymbols: ${{ steps.native_symbols.outputs.path }}
           status: completed
