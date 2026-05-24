@@ -161,10 +161,16 @@ jobs:
           debugSymbols: ${{ steps.native_symbols.outputs.path }}
           status: completed
 
+      - name: Prune Wear bundles from phone Play tracks
+        env:
+          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+        run: |
+          npm install --no-save googleapis@144
+          node scripts/prune-phone-track-versions.js --package com.eazpire.creator.wear
+
       - name: Audit Play tracks (Wear bundle must not be on phone tracks)
         env:
           PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
           VERSION_CODE: ${{ env.VERSION_CODE }}
         run: |
-          npm install --no-save googleapis@144
           node scripts/audit-play-tracks.js --package com.eazpire.creator.wear --version "$VERSION_CODE"
