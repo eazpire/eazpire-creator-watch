@@ -54,7 +54,7 @@ android {
         release {
             isMinifyEnabled = false
             ndk {
-                debugSymbolLevel = "SYMBOL_TABLE"
+                debugSymbolLevel = "FULL"
             }
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),

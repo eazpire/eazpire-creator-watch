@@ -136,12 +136,18 @@ jobs:
       - name: Locate native debug symbols
         id: native_symbols
         run: |
-          SYM=app/build/outputs/native-debug-symbols/release/native-debug-symbols.zip
-          if [ -f "$SYM" ]; then
+          SYM=""
+          for CAND in \
+            app/build/outputs/native-debug-symbols/release/native-debug-symbols.zip \
+            app/build/outputs/native-debug-symbols/release/*.zip; do
+            if [ -f "$CAND" ]; then SYM="$CAND"; break; fi
+          done
+          if [ -n "$SYM" ]; then
             echo "path=$SYM" >> "$GITHUB_OUTPUT"
             echo "Found native debug symbols: $SYM"
           else
-            echo "No native-debug-symbols.zip (Play may still warn if deps ship .so)"
+            echo "::warning::No native-debug-symbols.zip — Play may warn about native code (check .so in AAB)"
+            unzip -l app/build/outputs/bundle/release/app-release.aab | grep -E '\.so$' | head -5 || true
           fi
 
       - name: Upload to Google Play
@@ -154,3 +160,11 @@ jobs:
           track: ${{ env.PLAY_TRACK }}
           debugSymbols: ${{ steps.native_symbols.outputs.path }}
           status: completed
+
+      - name: Audit Play tracks (Wear bundle must not be on phone tracks)
+        env:
+          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          VERSION_CODE: ${{ env.VERSION_CODE }}
+        run: |
+          npm install --no-save googleapis@144
+          node scripts/audit-play-tracks.js --package com.eazpire.creator.wear --version "$VERSION_CODE"
