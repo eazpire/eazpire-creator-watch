@@ -15,6 +15,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import com.eazpire.creator.core.api.CreatorApi
 import com.eazpire.creator.core.api.CreatorPhoneUploadApi
 import com.eazpire.creator.core.auth.SecureTokenStore
@@ -34,9 +35,11 @@ fun WearDesignsScreen(
     refreshKey: Int,
     modifier: Modifier = Modifier,
 ) {
+    val context = LocalContext.current
     val ownerId = remember(tokenStore) { tokenStore.getOwnerId().orEmpty() }
     val api = remember(tokenStore) { CreatorApi(jwt = tokenStore.getJwt()) }
     val uploadApi = remember { CreatorPhoneUploadApi() }
+    val pendingStore = remember(context) { WearPendingUploadStore(context) }
     val uploadController = remember(uploadApi, translationStore) {
         WearPhoneUploadController(uploadApi, translationStore)
     }
@@ -44,11 +47,12 @@ fun WearDesignsScreen(
 
     var loading by remember { mutableStateOf(true) }
     var items by remember { mutableStateOf<List<WearCarouselItem>>(emptyList()) }
-    var searchQuery by remember { mutableStateOf("") }
+    var searchDraft by remember { mutableStateOf("") }
+    var appliedSearch by remember { mutableStateOf("") }
     var activityFilter by remember { mutableStateOf("active") }
     var loadNonce by remember { mutableIntStateOf(0) }
     var carouselIndex by remember { mutableIntStateOf(0) }
-    var highlightJobId by remember { mutableStateOf<String?>(null) }
+    var pendingUpload by remember { mutableStateOf(pendingStore.load()) }
     var uploading by remember { mutableStateOf(false) }
     var selectedDesign by remember { mutableStateOf<WearCarouselItem?>(null) }
     var publishedCountByDesignId by remember { mutableStateOf<Map<String, Int>>(emptyMap()) }
@@ -61,7 +65,10 @@ fun WearDesignsScreen(
                 ?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
                 ?.firstOrNull()
                 ?.trim()
-            if (!text.isNullOrBlank()) searchQuery = text
+            if (!text.isNullOrBlank()) {
+                searchDraft = text
+                appliedSearch = text
+            }
         }
     }
 
@@ -146,6 +153,41 @@ fun WearDesignsScreen(
         return map
     }
 
+    fun pendingCarouselItem(pending: WearPendingUploadStore.Pending): WearCarouselItem {
+        return WearCarouselItem(
+            imageUrl = pending.previewUrl,
+            label = pending.label ?: translationStore.t("wear.upload_processing", "Processing…"),
+            jobId = pending.jobId,
+            libraryStatus = "inactive",
+            isProcessing = true,
+        )
+    }
+
+    suspend fun mergePendingIntoList(base: List<WearCarouselItem>): List<WearCarouselItem> {
+        val pending = pendingUpload ?: return base
+        val jobId = pending.jobId
+        val existing = base.indexOfFirst { it.jobId == jobId }
+        if (existing >= 0) {
+            val row = base[existing]
+            if (!row.designId.isNullOrBlank()) {
+                pendingStore.clear()
+                pendingUpload = null
+                return base
+            }
+            return base.map {
+                if (it.jobId == jobId) {
+                    it.copy(
+                        imageUrl = it.imageUrl ?: pending.previewUrl,
+                        isProcessing = true,
+                    )
+                } else {
+                    it
+                }
+            }
+        }
+        return listOf(pendingCarouselItem(pending)) + base
+    }
+
     suspend fun loadDesignItems(): List<WearCarouselItem> {
         if (ownerId.isBlank()) return emptyList()
         val base = if (activityFilter == "inactive") {
@@ -153,26 +195,8 @@ fun WearDesignsScreen(
         } else {
             parseListItems(api.listSavedDesigns(ownerId, limit = 40))
         }
-        val hid = highlightJobId?.trim().orEmpty()
-        if (hid.isBlank() || base.any { it.jobId == hid }) return base
-        val jobsRes = api.listJobs(ownerId, limit = 30)
-        if (!jobsRes.optBoolean("ok", false)) return base
-        val arr = jobsRes.optJSONArray("items") ?: JSONArray()
-        for (i in 0 until arr.length()) {
-            val o = arr.optJSONObject(i) ?: continue
-            if (o.optString("job_id") != hid) continue
-            val preview = o.optString("preview_url", "")
-                .ifBlank { o.optJSONObject("result")?.optString("preview_url").orEmpty() }
-                .ifBlank { o.optString("image_url", "") }
-            if (preview.isBlank()) return base
-            return listOf(
-                WearCarouselItem(
-                    imageUrl = preview,
-                    label = translationStore.t("wear.upload_processing", "Uploading…"),
-                    jobId = hid,
-                    libraryStatus = "inactive",
-                ),
-            ) + base
+        if (activityFilter == "inactive") {
+            return mergePendingIntoList(base)
         }
         return base
     }
@@ -189,34 +213,61 @@ fun WearDesignsScreen(
             if (activityFilter == "active") {
                 publishedCountByDesignId = withContext(Dispatchers.IO) { loadPublishedSummaryMap() }
             }
-            carouselIndex = 0
         } catch (_: Exception) {
             items = emptyList()
         }
         loading = false
     }
 
-    LaunchedEffect(highlightJobId, activityFilter) {
-        val hid = highlightJobId ?: return@LaunchedEffect
-        if (activityFilter != "inactive") return@LaunchedEffect
+    LaunchedEffect(pendingUpload?.jobId, ownerId) {
+        val pending = pendingUpload ?: return@LaunchedEffect
+        if (ownerId.isBlank()) return@LaunchedEffect
         var attempts = 0
-        while (isActive && attempts < 45) {
+        while (isActive && attempts < 120) {
             delay(2000)
             attempts++
             try {
-                val list = withContext(Dispatchers.IO) { loadDesignItems() }
-                items = list
-                val idx = list.indexOfFirst { it.jobId == hid }
-                if (idx >= 0) {
-                    carouselIndex = idx
-                    if (!list[idx].imageUrl.isNullOrBlank()) {
-                        highlightJobId = null
+                var preview = pending.previewUrl
+                val jobsRes = withContext(Dispatchers.IO) { api.listJobs(ownerId, limit = 30) }
+                if (jobsRes.optBoolean("ok", false)) {
+                    val arr = jobsRes.optJSONArray("items") ?: JSONArray()
+                    for (i in 0 until arr.length()) {
+                        val o = arr.optJSONObject(i) ?: continue
+                        if (o.optString("job_id") != pending.jobId) continue
+                        val p = o.optString("preview_url", "")
+                            .ifBlank { o.optJSONObject("result")?.optString("preview_url").orEmpty() }
+                            .ifBlank { o.optString("image_url", "") }
+                        if (p.isNotBlank()) preview = p
+                        val done = o.optBoolean("done", false)
+                        val saved = o.optBoolean("saved", false)
+                        val saving = o.optBoolean("saving", false)
+                        if (done && saved && !saving) {
+                            pendingStore.clear()
+                            pendingUpload = null
+                            loadNonce++
+                            return@LaunchedEffect
+                        }
                         break
                     }
                 }
+                if (preview != pending.previewUrl) {
+                    val next = pending.copy(previewUrl = preview)
+                    pendingStore.save(next)
+                    pendingUpload = next
+                }
+                val list = withContext(Dispatchers.IO) { loadDesignItems() }
+                items = list
+                val idx = list.indexOfFirst { it.jobId == pending.jobId }
+                if (idx >= 0) carouselIndex = idx
+                val row = list.getOrNull(idx)
+                if (row != null && !row.designId.isNullOrBlank() && !row.isProcessing) {
+                    pendingStore.clear()
+                    pendingUpload = null
+                    loadNonce++
+                    return@LaunchedEffect
+                }
             } catch (_: Exception) { /* ignore */ }
         }
-        highlightJobId = null
     }
 
     fun startDesignUploadQr() {
@@ -232,7 +283,13 @@ fun WearDesignsScreen(
                         .ifBlank { res.optString("job_id", "") }
                     if (res.optBoolean("ok", false) || jobId.isNotBlank()) {
                         activityFilter = "inactive"
-                        highlightJobId = jobId.takeIf { it.isNotBlank() }
+                        val pending = WearPendingUploadStore.Pending(
+                            jobId = jobId,
+                            previewUrl = imageUrl,
+                            label = translationStore.t("wear.upload_processing", "Processing…"),
+                        )
+                        pendingStore.save(pending)
+                        pendingUpload = pending
                         carouselIndex = 0
                         loadNonce++
                     } else {
@@ -260,8 +317,10 @@ fun WearDesignsScreen(
             } else {
                 translationStore.t("wear.no_designs", "No designs yet")
             },
-            searchQuery = searchQuery,
-            onSearchQueryChange = { searchQuery = it },
+            searchText = searchDraft,
+            onSearchTextChange = { searchDraft = it },
+            onSearchSubmit = { appliedSearch = searchDraft.trim() },
+            filterQuery = appliedSearch,
             onVoiceSearch = { launchVoice() },
             onUploadClick = { startDesignUploadQr() },
             searchPlaceholder = translationStore.t("wear.search_short", "Search…"),
@@ -272,7 +331,10 @@ fun WearDesignsScreen(
             inactiveLabel = translationStore.t("wear.designs_inactive", "Inactive"),
             initialCarouselIndex = carouselIndex,
             onItemClick = { item ->
-                if (!item.designId.isNullOrBlank()) selectedDesign = item
+                if (item.isProcessing) return@WearCarouselScreen
+                if (!item.designId.isNullOrBlank() || !item.jobId.isNullOrBlank()) {
+                    selectedDesign = item
+                }
             },
             modifier = Modifier.fillMaxSize(),
         )

@@ -130,6 +130,13 @@ class CreatorApi(
             method = "DELETE",
         )
 
+    suspend fun deleteJob(ownerId: String, jobId: String): JSONObject =
+        call(
+            "delete-job",
+            mapOf("owner_id" to ownerId, "job_id" to jobId),
+            method = "POST",
+        )
+
     suspend fun batchUnpublishPublished(ownerId: String, publishedIds: List<Int>): JSONObject {
         val body = JSONObject().put(
             "published_design_ids",

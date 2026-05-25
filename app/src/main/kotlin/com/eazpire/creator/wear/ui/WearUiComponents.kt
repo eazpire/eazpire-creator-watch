@@ -11,16 +11,24 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
@@ -120,15 +128,61 @@ fun WearUploadIconButton(
     }
 }
 
+/** Circular icon-only action (triangle menu layout). */
+@Composable
+fun WearIconCircleButton(
+    onClick: () -> Unit,
+    icon: String,
+    contentDescription: String,
+    modifier: Modifier = Modifier.size(44.dp),
+    enabled: Boolean = true,
+) {
+    Box(
+        modifier = modifier
+            .clip(CircleShape)
+            .background(if (enabled) EazColors.Orange else EazColors.Orange.copy(alpha = 0.4f))
+            .clickable(enabled = enabled, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(icon, fontSize = 18.sp, color = EazColors.TextPrimary)
+    }
+}
+
+@Composable
+fun WearTriangleIconActions(
+    topStart: @Composable () -> Unit,
+    topEnd: @Composable () -> Unit,
+    bottomCenter: @Composable () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(20.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            topStart()
+            topEnd()
+        }
+        bottomCenter()
+    }
+}
+
 @Composable
 fun WearSearchBar(
     query: String,
     onQueryChange: (String) -> Unit,
+    onSearchSubmit: () -> Unit = {},
     onVoiceClick: () -> Unit,
     placeholder: String,
     modifier: Modifier = Modifier,
     compact: Boolean = false,
 ) {
+    val focusManager = LocalFocusManager.current
+    val keyboard = LocalSoftwareKeyboardController.current
     val padH = if (compact) 6.dp else 10.dp
     val padV = if (compact) 2.dp else 6.dp
     val micSize = if (compact) 28.dp else 40.dp
@@ -155,6 +209,14 @@ fun WearSearchBar(
             ),
             singleLine = true,
             cursorBrush = SolidColor(EazColors.Orange),
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+            keyboardActions = KeyboardActions(
+                onSearch = {
+                    onSearchSubmit()
+                    focusManager.clearFocus()
+                    keyboard?.hide()
+                },
+            ),
             decorationBox = { inner ->
                 Box {
                     if (query.isBlank()) {

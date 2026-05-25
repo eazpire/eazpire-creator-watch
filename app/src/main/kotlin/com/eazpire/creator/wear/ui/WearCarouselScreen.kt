@@ -37,6 +37,8 @@ data class WearCarouselItem(
     val jobId: String? = null,
     val designId: String? = null,
     val libraryStatus: String? = null,
+    val productKey: String? = null,
+    val isProcessing: Boolean = false,
 )
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -45,8 +47,10 @@ fun WearCarouselScreen(
     items: List<WearCarouselItem>,
     loading: Boolean,
     emptyText: String,
-    searchQuery: String = "",
-    onSearchQueryChange: (String) -> Unit = {},
+    searchText: String = "",
+    onSearchTextChange: (String) -> Unit = {},
+    onSearchSubmit: () -> Unit = {},
+    filterQuery: String = searchText,
     onVoiceSearch: () -> Unit = {},
     searchPlaceholder: String = "Search…",
     showSearch: Boolean = false,
@@ -56,14 +60,15 @@ fun WearCarouselScreen(
     inactiveLabel: String = "Inactive",
     onUploadClick: (() -> Unit)? = null,
     onItemClick: ((WearCarouselItem) -> Unit)? = null,
+    onPageIndexChanged: ((Int, WearCarouselItem?) -> Unit)? = null,
     initialCarouselIndex: Int = 0,
     modifier: Modifier = Modifier,
 ) {
-    var index by remember(items, searchQuery, initialCarouselIndex) {
+    var index by remember(items, filterQuery, initialCarouselIndex) {
         mutableIntStateOf(initialCarouselIndex.coerceAtLeast(0))
     }
-    val filtered = remember(items, searchQuery) {
-        val q = searchQuery.trim()
+    val filtered = remember(items, filterQuery) {
+        val q = filterQuery.trim()
         if (q.isBlank()) items
         else items.filter {
             it.label?.contains(q, ignoreCase = true) == true ||
@@ -74,6 +79,10 @@ fun WearCarouselScreen(
     val safeIndex = index.coerceIn(0, (total - 1).coerceAtLeast(0))
     if (safeIndex != index) index = safeIndex
     val current = filtered.getOrNull(safeIndex)
+
+    androidx.compose.runtime.LaunchedEffect(safeIndex, current?.productKey, current?.jobId) {
+        onPageIndexChanged?.invoke(safeIndex, current)
+    }
 
     Column(
         modifier = modifier.fillMaxSize(),
@@ -88,9 +97,10 @@ fun WearCarouselScreen(
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 WearSearchBar(
-                    query = searchQuery,
-                    onQueryChange = {
-                        onSearchQueryChange(it)
+                    query = searchText,
+                    onQueryChange = onSearchTextChange,
+                    onSearchSubmit = {
+                        onSearchSubmit()
                         index = 0
                     },
                     onVoiceClick = onVoiceSearch,
@@ -166,7 +176,7 @@ fun WearCarouselScreen(
                         .weight(1f)
                         .fillMaxWidth()
                         .then(
-                            if (onItemClick != null && current != null) {
+                            if (onItemClick != null && current != null && !current.isProcessing) {
                                 Modifier.clickable { onItemClick(current) }
                             } else {
                                 Modifier
@@ -197,6 +207,14 @@ fun WearCarouselScreen(
                             style = MaterialTheme.typography.body2,
                             textAlign = TextAlign.Center,
                             modifier = Modifier.padding(horizontal = 12.dp),
+                        )
+                    }
+                    if (current?.isProcessing == true) {
+                        CircularProgressIndicator(
+                            modifier = Modifier
+                                .align(Alignment.BottomCenter)
+                                .padding(bottom = 4.dp),
+                            strokeWidth = 2.dp,
                         )
                     }
                 }

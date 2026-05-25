@@ -4,10 +4,11 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
@@ -20,7 +21,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.wear.compose.material.Button
 import androidx.wear.compose.material.CircularProgressIndicator
 import androidx.wear.compose.material.MaterialTheme
 import androidx.wear.compose.material.Text
@@ -55,17 +55,19 @@ fun WearDesignLibraryActionsHost(
 ) {
     val design = item ?: return
     val designId = design.designId?.trim().orEmpty()
-    if (designId.isBlank()) return
+    val jobId = design.jobId?.trim().orEmpty()
+    if (designId.isBlank() && jobId.isBlank()) return
 
     val scope = rememberCoroutineScope()
-    var phase by remember(designId) { mutableStateOf(WearDesignActionPhase.MENU) }
+    var phase by remember(designId, jobId) { mutableStateOf(WearDesignActionPhase.MENU) }
     var busy by remember { mutableStateOf(false) }
     var errorText by remember { mutableStateOf<String?>(null) }
     var creatorNames by remember { mutableStateOf<List<String>>(emptyList()) }
     var selectedCreator by remember { mutableStateOf<String?>(null) }
 
-    val isActive = activityFilter == "active" || design.libraryStatus == "active"
-    val publishedCount = publishedCountByDesignId[designId] ?: 0
+    val hasDesignId = designId.isNotBlank()
+    val isActive = hasDesignId && (activityFilter == "active" || design.libraryStatus == "active")
+    val publishedCount = if (hasDesignId) publishedCountByDesignId[designId] ?: 0 else 0
 
     suspend fun loadCreators(): List<String> {
         val res = withContext(Dispatchers.IO) { api.getSettings(ownerId) }
@@ -84,7 +86,10 @@ fun WearDesignLibraryActionsHost(
         busy = true
         errorText = null
         try {
-            val res = withContext(Dispatchers.IO) { api.deleteDesign(ownerId, designId) }
+            val res = withContext(Dispatchers.IO) {
+                if (hasDesignId) api.deleteDesign(ownerId, designId)
+                else api.deleteJob(ownerId, jobId)
+            }
             if (!res.optBoolean("ok", false)) {
                 errorText = formatWearApiError(
                     translationStore,
@@ -103,6 +108,7 @@ fun WearDesignLibraryActionsHost(
     }
 
     suspend fun runDeactivate() {
+        if (!hasDesignId) return
         busy = true
         errorText = null
         try {
@@ -156,6 +162,7 @@ fun WearDesignLibraryActionsHost(
     }
 
     suspend fun runActivate(creatorName: String) {
+        if (!hasDesignId) return
         busy = true
         errorText = null
         try {
@@ -183,6 +190,7 @@ fun WearDesignLibraryActionsHost(
     }
 
     fun startActivateFlow() {
+        if (!hasDesignId) return
         scope.launch {
             busy = true
             errorText = null
@@ -222,53 +230,79 @@ fun WearDesignLibraryActionsHost(
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 10.dp, vertical = 6.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(6.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             if (busy) {
                 CircularProgressIndicator()
             }
 
+            Text(
+                text = design.label ?: translationStore.t("wear.design", "Design"),
+                style = MaterialTheme.typography.caption2,
+                textAlign = TextAlign.Center,
+                maxLines = 2,
+            )
+
             when (phase) {
                 WearDesignActionPhase.MENU -> {
-                    Text(
-                        text = design.label ?: translationStore.t("wear.design", "Design"),
-                        style = MaterialTheme.typography.caption2,
-                        textAlign = TextAlign.Center,
-                        maxLines = 2,
-                    )
                     if (isActive) {
-                        Button(
-                            onClick = { phase = WearDesignActionPhase.CONFIRM_DELETE },
-                            modifier = Modifier.fillMaxWidth(),
-                            enabled = !busy,
-                        ) {
-                            Text(translationStore.t("wear.action_delete", "Delete"))
-                        }
-                        Button(
-                            onClick = { phase = WearDesignActionPhase.CONFIRM_DEACTIVATE },
-                            modifier = Modifier.fillMaxWidth(),
-                            enabled = !busy,
-                        ) {
-                            Text(translationStore.t("wear.design_deactivate", "Deactivate"))
-                        }
+                        WearTriangleIconActions(
+                            topStart = {
+                                WearIconCircleButton(
+                                    onClick = { phase = WearDesignActionPhase.CONFIRM_DELETE },
+                                    icon = "🗑",
+                                    contentDescription = translationStore.t("wear.action_delete", "Delete"),
+                                    enabled = !busy,
+                                )
+                            },
+                            topEnd = {
+                                WearIconCircleButton(
+                                    onClick = { phase = WearDesignActionPhase.CONFIRM_DEACTIVATE },
+                                    icon = "⏸",
+                                    contentDescription = translationStore.t("wear.design_deactivate", "Deactivate"),
+                                    enabled = !busy,
+                                )
+                            },
+                            bottomCenter = {
+                                WearIconCircleButton(
+                                    onClick = onDismiss,
+                                    icon = "←",
+                                    contentDescription = translationStore.t("wear.back", "Back"),
+                                    enabled = !busy,
+                                )
+                            },
+                        )
                     } else {
-                        Button(
-                            onClick = { phase = WearDesignActionPhase.CONFIRM_DELETE },
-                            modifier = Modifier.fillMaxWidth(),
-                            enabled = !busy,
-                        ) {
-                            Text(translationStore.t("wear.action_delete", "Delete"))
-                        }
-                        Button(
-                            onClick = { startActivateFlow() },
-                            modifier = Modifier.fillMaxWidth(),
-                            enabled = !busy,
-                        ) {
-                            Text(translationStore.t("wear.design_activate", "Activate"))
-                        }
-                    }
-                    Button(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) {
-                        Text(translationStore.t("wear.back", "Back"))
+                        WearTriangleIconActions(
+                            topStart = {
+                                WearIconCircleButton(
+                                    onClick = { phase = WearDesignActionPhase.CONFIRM_DELETE },
+                                    icon = "🗑",
+                                    contentDescription = translationStore.t("wear.action_delete", "Delete"),
+                                    enabled = !busy,
+                                )
+                            },
+                            topEnd = {
+                                if (hasDesignId) {
+                                    WearIconCircleButton(
+                                        onClick = { startActivateFlow() },
+                                        icon = "✓",
+                                        contentDescription = translationStore.t("wear.design_activate", "Activate"),
+                                        enabled = !busy,
+                                    )
+                                } else {
+                                    Spacer(modifier = Modifier.size(44.dp))
+                                }
+                            },
+                            bottomCenter = {
+                                WearIconCircleButton(
+                                    onClick = onDismiss,
+                                    icon = "←",
+                                    contentDescription = translationStore.t("wear.back", "Back"),
+                                    enabled = !busy,
+                                )
+                            },
+                        )
                     }
                 }
 
@@ -279,61 +313,57 @@ fun WearDesignLibraryActionsHost(
                             "Deleting will remove {{count}} products.",
                         ).replace("{{count}}", publishedCount.toString())
                     } else {
-                        translationStore.t(
-                            "wear.design_delete_confirm",
-                            "Delete this design?",
-                        )
+                        translationStore.t("wear.design_delete_confirm", "Delete this design?")
                     }
                     Text(text = warn, style = MaterialTheme.typography.caption2, textAlign = TextAlign.Center)
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    ) {
-                        Button(
-                            onClick = { scope.launch { runDelete() } },
-                            modifier = Modifier.weight(1f),
-                            enabled = !busy,
-                        ) {
-                            Text(translationStore.t("wear.confirm", "Confirm"))
-                        }
-                        Button(
-                            onClick = { phase = WearDesignActionPhase.MENU },
-                            modifier = Modifier.weight(1f),
-                            enabled = !busy,
-                        ) {
-                            Text(translationStore.t("wear.cancel", "Cancel"))
-                        }
-                    }
+                    WearTriangleIconActions(
+                        topStart = {
+                            WearIconCircleButton(
+                                onClick = { scope.launch { runDelete() } },
+                                icon = "✓",
+                                contentDescription = translationStore.t("wear.confirm", "Confirm"),
+                                enabled = !busy,
+                            )
+                        },
+                        topEnd = {
+                            WearIconCircleButton(
+                                onClick = { phase = WearDesignActionPhase.MENU },
+                                icon = "✕",
+                                contentDescription = translationStore.t("wear.cancel", "Cancel"),
+                                enabled = !busy,
+                            )
+                        },
+                        bottomCenter = {
+                            Spacer(modifier = Modifier.size(44.dp))
+                        },
+                    )
                 }
 
                 WearDesignActionPhase.CONFIRM_DEACTIVATE -> {
                     Text(
-                        text = translationStore.t(
-                            "wear.design_deactivate_confirm",
-                            "Deactivate this design?",
-                        ),
+                        text = translationStore.t("wear.design_deactivate_confirm", "Deactivate this design?"),
                         style = MaterialTheme.typography.caption2,
                         textAlign = TextAlign.Center,
                     )
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    ) {
-                        Button(
-                            onClick = { scope.launch { runDeactivate() } },
-                            modifier = Modifier.weight(1f),
-                            enabled = !busy,
-                        ) {
-                            Text(translationStore.t("wear.confirm", "Confirm"))
-                        }
-                        Button(
-                            onClick = { phase = WearDesignActionPhase.MENU },
-                            modifier = Modifier.weight(1f),
-                            enabled = !busy,
-                        ) {
-                            Text(translationStore.t("wear.cancel", "Cancel"))
-                        }
-                    }
+                    WearTriangleIconActions(
+                        topStart = {
+                            WearIconCircleButton(
+                                onClick = { scope.launch { runDeactivate() } },
+                                icon = "✓",
+                                contentDescription = translationStore.t("wear.confirm", "Confirm"),
+                                enabled = !busy,
+                            )
+                        },
+                        topEnd = {
+                            WearIconCircleButton(
+                                onClick = { phase = WearDesignActionPhase.MENU },
+                                icon = "✕",
+                                contentDescription = translationStore.t("wear.cancel", "Cancel"),
+                                enabled = !busy,
+                            )
+                        },
+                        bottomCenter = { Spacer(modifier = Modifier.size(44.dp)) },
+                    )
                 }
 
                 WearDesignActionPhase.CONFIRM_ACTIVATE -> {
@@ -346,55 +376,52 @@ fun WearDesignLibraryActionsHost(
                         style = MaterialTheme.typography.caption2,
                         textAlign = TextAlign.Center,
                     )
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    ) {
-                        Button(
-                            onClick = { scope.launch { runActivate(name) } },
-                            modifier = Modifier.weight(1f),
-                            enabled = !busy && name.isNotBlank(),
-                        ) {
-                            Text(translationStore.t("wear.confirm", "Confirm"))
-                        }
-                        Button(
-                            onClick = { phase = WearDesignActionPhase.MENU },
-                            modifier = Modifier.weight(1f),
-                            enabled = !busy,
-                        ) {
-                            Text(translationStore.t("wear.cancel", "Cancel"))
-                        }
-                    }
+                    WearTriangleIconActions(
+                        topStart = {
+                            WearIconCircleButton(
+                                onClick = { scope.launch { runActivate(name) } },
+                                icon = "✓",
+                                contentDescription = translationStore.t("wear.confirm", "Confirm"),
+                                enabled = !busy && name.isNotBlank(),
+                            )
+                        },
+                        topEnd = {
+                            WearIconCircleButton(
+                                onClick = { phase = WearDesignActionPhase.MENU },
+                                icon = "✕",
+                                contentDescription = translationStore.t("wear.cancel", "Cancel"),
+                                enabled = !busy,
+                            )
+                        },
+                        bottomCenter = { Spacer(modifier = Modifier.size(44.dp)) },
+                    )
                 }
 
                 WearDesignActionPhase.PICK_CREATOR -> {
                     Text(
-                        text = translationStore.t(
-                            "wear.design_pick_creator",
-                            "Choose creator",
-                        ),
+                        text = translationStore.t("wear.design_pick_creator", "Choose creator"),
                         style = MaterialTheme.typography.caption2,
                         textAlign = TextAlign.Center,
                     )
                     for (name in creatorNames) {
-                        Button(
+                        WearIconCircleButton(
                             onClick = {
                                 selectedCreator = name
                                 phase = WearDesignActionPhase.CONFIRM_ACTIVATE
                             },
-                            modifier = Modifier.fillMaxWidth(),
+                            icon = "◎",
+                            contentDescription = name,
+                            modifier = Modifier.size(40.dp),
                             enabled = !busy,
-                        ) {
-                            Text(name, maxLines = 1)
-                        }
+                        )
+                        Text(name, style = MaterialTheme.typography.caption2, maxLines = 1)
                     }
-                    Button(
+                    WearIconCircleButton(
                         onClick = { phase = WearDesignActionPhase.MENU },
-                        modifier = Modifier.fillMaxWidth(),
+                        icon = "←",
+                        contentDescription = translationStore.t("wear.cancel", "Cancel"),
                         enabled = !busy,
-                    ) {
-                        Text(translationStore.t("wear.cancel", "Cancel"))
-                    }
+                    )
                 }
             }
 
