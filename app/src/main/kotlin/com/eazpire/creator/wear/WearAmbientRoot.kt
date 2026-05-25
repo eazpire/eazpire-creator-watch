@@ -5,20 +5,18 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.wear.compose.foundation.AmbientMode
-import androidx.wear.compose.foundation.LocalAmbientModeManager
 import com.eazpire.creator.core.auth.SecureTokenStore
 import com.eazpire.creator.wear.ui.WearSplashScreen
 
 /**
- * Wear OS switches to ambient (low power) quickly; [Scaffold] then draws a tiny strip
- * and the watch face stays visible. In ambient we fill the full display with the logo.
+ * Wear OS ambient mode draws a tiny UI strip unless we take over the full display.
+ * Interactive mode shows the full app (no widget / complication).
  */
 @Composable
-fun WearAmbientRoot(tokenStore: SecureTokenStore) {
-    val ambientManager = LocalAmbientModeManager.current
-    val isAmbient = ambientManager?.currentAmbientMode is AmbientMode.Ambient
-
+fun WearAmbientRoot(
+    tokenStore: SecureTokenStore,
+    isAmbient: Boolean,
+) {
     Box(
         modifier = Modifier
             .fillMaxSize()

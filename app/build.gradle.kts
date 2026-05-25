@@ -98,6 +98,7 @@ dependencies {
     implementation("androidx.wear.compose:compose-material:1.4.0")
     implementation("androidx.wear.compose:compose-foundation:1.4.0")
     implementation("androidx.wear.compose:compose-navigation:1.4.0")
+    implementation("androidx.wear:wear:1.3.0")
 
     implementation("com.google.android.gms:play-services-wearable:18.2.0")
     implementation("io.coil-kt:coil-compose:2.5.0")

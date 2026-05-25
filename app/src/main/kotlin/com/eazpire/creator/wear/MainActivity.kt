@@ -6,7 +6,9 @@ import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.lifecycleScope
 import androidx.wear.ambient.AmbientLifecycleObserver
@@ -21,9 +23,18 @@ class MainActivity : ComponentActivity() {
     private val isAmbientState = mutableStateOf(false)
 
     private val ambientObserver: AmbientLifecycleObserver by lazy {
-        AmbientLifecycleObserver(this) { ambientState ->
-            isAmbientState.value = ambientState.isAmbient
-        }
+        AmbientLifecycleObserver(
+            this,
+            object : AmbientLifecycleObserver.AmbientLifecycleCallback {
+                override fun onEnterAmbient(ambientDetails: AmbientLifecycleObserver.AmbientDetails) {
+                    isAmbientState.value = true
+                }
+
+                override fun onExitAmbient() {
+                    isAmbientState.value = false
+                }
+            },
+        )
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -35,9 +46,10 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             WearEazTheme {
+                val isAmbient by isAmbientState
                 WearAmbientRoot(
                     tokenStore = tokenStore,
-                    isAmbient = isAmbientState.value,
+                    isAmbient = isAmbient,
                 )
             }
         }
