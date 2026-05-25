@@ -7,7 +7,6 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
-import java.net.URLEncoder
 
 internal const val WEAR_PRODUCT_MOCKUP_PREFETCH = 10
 internal const val WEAR_PRODUCT_MOCKUP_CHUNK = 30

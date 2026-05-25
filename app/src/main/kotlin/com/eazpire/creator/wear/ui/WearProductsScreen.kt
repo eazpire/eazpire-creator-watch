@@ -19,6 +19,7 @@ import com.eazpire.creator.core.i18n.WearTranslationStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -80,10 +81,10 @@ fun WearProductsScreen(
         }
     }
 
-    suspend fun enrichImagesFor(items: List<WearCarouselItem>) {
-        if (ownerId.isBlank() || items.isEmpty()) return
+    suspend fun enrichImagesFor(items: List<WearCarouselItem>) = coroutineScope {
+        if (ownerId.isBlank() || items.isEmpty()) return@coroutineScope
         val need = items.filter { it.needsWearImageEnrichment(mockupCache, previewCache, storefrontCache) }
-        if (need.isEmpty()) return
+        if (need.isEmpty()) return@coroutineScope
 
         val mockKeys = need.mapNotNull { it.productKey }.distinct()
         val designIds = need.mapNotNull { it.designId }.distinct()
