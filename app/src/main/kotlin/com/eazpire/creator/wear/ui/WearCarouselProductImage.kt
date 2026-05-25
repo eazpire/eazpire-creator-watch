@@ -7,6 +7,10 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
@@ -31,19 +35,21 @@ fun WearCarouselProductImage(
 ) {
     val showImage = isWearLoadableImageUrl(imageUrl)
     val fallbackLabel = label?.takeIf { it.isNotBlank() } ?: "—"
+    var imageLoaded by remember(imageUrl) { mutableStateOf(false) }
 
     Box(
         modifier = modifier,
         contentAlignment = Alignment.Center,
     ) {
-        if (!showImage) {
+        if (!showImage || !imageLoaded) {
             Text(
                 text = fallbackLabel,
                 style = MaterialTheme.typography.body2,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.padding(horizontal = 12.dp),
             )
-        } else {
+        }
+        if (showImage) {
             SubcomposeAsyncImage(
                 model = imageUrl,
                 contentDescription = fallbackLabel,
@@ -57,35 +63,18 @@ fun WearCarouselProductImage(
                     }
                 },
                 error = {
-                    Text(
-                        text = fallbackLabel,
-                        style = MaterialTheme.typography.body2,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.padding(horizontal = 12.dp),
-                    )
+                    imageLoaded = false
                 },
                 success = { state ->
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Image(
-                            painter = state.painter,
-                            contentDescription = fallbackLabel,
-                            modifier = Modifier
-                                .fillMaxWidth(0.92f)
-                                .fillMaxHeight(0.82f),
-                            contentScale = ContentScale.Fit,
-                        )
-                        Text(
-                            text = fallbackLabel,
-                            style = MaterialTheme.typography.caption2,
-                            color = EazColors.TextPrimary.copy(alpha = 0.7f),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier
-                                .padding(horizontal = 8.dp)
-                                .padding(top = 2.dp),
-                        )
-                    }
+                    imageLoaded = true
+                    Image(
+                        painter = state.painter,
+                        contentDescription = fallbackLabel,
+                        modifier = Modifier
+                            .fillMaxWidth(0.92f)
+                            .fillMaxHeight(0.88f),
+                        contentScale = ContentScale.Fit,
+                    )
                 },
             )
         }

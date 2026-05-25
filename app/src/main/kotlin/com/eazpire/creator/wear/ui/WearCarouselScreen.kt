@@ -38,6 +38,7 @@ data class WearCarouselItem(
     val designId: String? = null,
     val libraryStatus: String? = null,
     val productKey: String? = null,
+    val shopifyHandle: String? = null,
     val isProcessing: Boolean = false,
 )
 

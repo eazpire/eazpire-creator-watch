@@ -17,6 +17,8 @@ import com.eazpire.creator.core.api.CreatorApi
 import com.eazpire.creator.core.auth.SecureTokenStore
 import com.eazpire.creator.core.i18n.WearTranslationStore
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -34,13 +36,15 @@ fun WearProductsScreen(
     var loading by remember { mutableStateOf(true) }
     var catalog by remember { mutableStateOf<List<WearCarouselItem>>(emptyList()) }
     var mockupCache by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
+    var previewCache by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
+    var storefrontCache by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
     var searchDraft by remember { mutableStateOf("") }
     var appliedSearch by remember { mutableStateOf("") }
     var carouselIndex by remember { mutableIntStateOf(0) }
     val fetchingKeys = remember { mutableStateOf(setOf<String>()) }
 
-    val displayItems = remember(catalog, mockupCache) {
-        catalog.map { it.withResolvedImage(mockupCache) }
+    val displayItems = remember(catalog, mockupCache, previewCache, storefrontCache) {
+        catalog.map { it.withResolvedImage(mockupCache, previewCache, storefrontCache) }
     }
 
     val speechLauncher = rememberLauncherForActivityResult(
@@ -76,34 +80,59 @@ fun WearProductsScreen(
         }
     }
 
-    fun prefetchMockupsAround(index: Int, items: List<WearCarouselItem>) {
+    suspend fun enrichImagesFor(items: List<WearCarouselItem>) {
+        if (ownerId.isBlank() || items.isEmpty()) return
+        val need = items.filter { it.needsWearImageEnrichment(mockupCache, previewCache, storefrontCache) }
+        if (need.isEmpty()) return
+
+        val mockKeys = need.mapNotNull { it.productKey }.distinct()
+        val designIds = need.mapNotNull { it.designId }.distinct()
+        val handles = need.mapNotNull { it.shopifyHandle }.distinct()
+
+        val mockDeferred = async(Dispatchers.IO) {
+            if (mockKeys.isEmpty()) emptyMap()
+            else fetchWearProductMockups(api, ownerId, mockKeys)
+        }
+        val previewDeferred = async(Dispatchers.IO) {
+            if (designIds.isEmpty()) emptyMap()
+            else fetchWearDesignPreviews(api, ownerId, designIds)
+        }
+        val storefrontDeferred = async(Dispatchers.IO) {
+            if (handles.isEmpty()) emptyMap()
+            else withContext(Dispatchers.IO) {
+                handles.map { handle ->
+                    async {
+                        val url = fetchWearStorefrontImage(handle)
+                        if (url != null) handle to url else null
+                    }
+                }.awaitAll().filterNotNull().toMap()
+            }
+        }
+
+        val mockLoaded = mockDeferred.await()
+        val previewLoaded = previewDeferred.await()
+        val storefrontLoaded = storefrontDeferred.await()
+
+        if (mockLoaded.isNotEmpty()) mockupCache = mockupCache + mockLoaded
+        if (previewLoaded.isNotEmpty()) previewCache = previewCache + previewLoaded
+        if (storefrontLoaded.isNotEmpty()) storefrontCache = storefrontCache + storefrontLoaded
+    }
+
+    fun prefetchAround(index: Int, items: List<WearCarouselItem>) {
         if (ownerId.isBlank()) return
         val filtered = filteredItems(items)
         if (filtered.isEmpty()) return
         val safe = index.coerceIn(0, filtered.lastIndex)
-        val keys = filtered.drop(safe).take(WEAR_PRODUCT_MOCKUP_PREFETCH)
-            .mapNotNull { it.productKey }
-            .filter { pk ->
-                !fetchingKeys.value.contains(pk) &&
-                    (!mockupCache.containsKey(pk) || !isWearLoadableImageUrl(mockupCache[pk]))
-            }
-            .filter { pk ->
-                val row = filtered.find { it.productKey == pk }
-                row != null && !isWearLoadableImageUrl(row.resolvedProductImage(mockupCache))
-            }
-        if (keys.isEmpty()) return
-        fetchingKeys.value = fetchingKeys.value + keys
+        val window = filtered.drop(safe).take(WEAR_PRODUCT_MOCKUP_PREFETCH)
+        val token = window.joinToString("|") { "${it.productKey}:${it.designId}:${it.shopifyHandle}" }
+        if (fetchingKeys.value.contains(token)) return
+        fetchingKeys.value = fetchingKeys.value + token
         scope.launch {
             try {
-                val loaded = withContext(Dispatchers.IO) {
-                    fetchWearProductMockups(api, ownerId, keys)
-                }
-                if (loaded.isNotEmpty()) {
-                    mockupCache = mockupCache + loaded
-                }
+                enrichImagesFor(window)
             } catch (_: Exception) { /* ignore */ }
             finally {
-                fetchingKeys.value = fetchingKeys.value - keys.toSet()
+                fetchingKeys.value = fetchingKeys.value - token
             }
         }
     }
@@ -115,27 +144,23 @@ fun WearProductsScreen(
             return@LaunchedEffect
         }
         loading = true
+        mockupCache = emptyMap()
+        previewCache = emptyMap()
+        storefrontCache = emptyMap()
+        fetchingKeys.value = emptySet()
+        carouselIndex = 0
         try {
             catalog = withContext(Dispatchers.IO) { loadWearProductCatalog(api, ownerId) }
-            mockupCache = emptyMap()
-            fetchingKeys.value = emptySet()
-            carouselIndex = 0
-            val initialKeys = catalog.mapNotNull { it.productKey }.take(WEAR_PRODUCT_MOCKUP_PREFETCH)
-            if (initialKeys.isNotEmpty()) {
-                val loaded = withContext(Dispatchers.IO) {
-                    fetchWearProductMockups(api, ownerId, initialKeys)
-                }
-                mockupCache = loaded
-            }
+            enrichImagesFor(catalog.take(WEAR_PRODUCT_MOCKUP_PREFETCH))
         } catch (_: Exception) {
             catalog = emptyList()
         }
         loading = false
     }
 
-    LaunchedEffect(carouselIndex, appliedSearch, catalog.size) {
+    LaunchedEffect(carouselIndex, appliedSearch, catalog.size, loading) {
         if (!loading && catalog.isNotEmpty()) {
-            prefetchMockupsAround(carouselIndex, displayItems)
+            prefetchAround(carouselIndex, displayItems)
         }
     }
 
@@ -154,7 +179,7 @@ fun WearProductsScreen(
         initialCarouselIndex = carouselIndex,
         onPageIndexChanged = { index, _ ->
             carouselIndex = index
-            prefetchMockupsAround(index, displayItems)
+            prefetchAround(index, displayItems)
         },
         modifier = modifier,
     )

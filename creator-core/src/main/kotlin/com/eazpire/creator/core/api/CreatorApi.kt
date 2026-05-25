@@ -120,6 +120,12 @@ class CreatorApi(
         )
     }
 
+    suspend fun getDesignPreviews(ownerId: String, designIds: String): JSONObject =
+        call(
+            "get-design-previews",
+            mapOf("owner_id" to ownerId, "design_ids" to designIds),
+        )
+
     suspend fun getSettings(ownerId: String): JSONObject =
         call("get-settings", mapOf("owner_id" to ownerId))
 
