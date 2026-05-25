@@ -34,7 +34,11 @@ class WearTranslationStore(private var lang: String = "en") {
     companion object {
         private val strings = mapOf(
             "wear.pair_title" to "Pair with phone",
-            "wear.pair_body" to "Log in to the Eazpire app on your phone. Your session will sync to this watch.",
+            "wear.pair_body" to "Log in with the Eazpire app on your phone.",
+            "wear.pair_qr_hint" to "Creator Settings → Creator Wear → Connect, then scan this QR.",
+            "wear.pair_qr_loading" to "Preparing QR…",
+            "wear.pair_qr_error" to "Could not start pairing",
+            "wear.pair_sync_hint" to "Or log in on the phone app — session may sync automatically.",
             "wear.dashboard" to "Dashboard",
             "wear.jobs" to "Active Jobs",
             "wear.upload" to "Phone upload",

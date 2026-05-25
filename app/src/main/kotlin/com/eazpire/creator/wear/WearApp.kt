@@ -122,9 +122,11 @@ fun WearApp(
                 showSplash -> WearSplashScreen(modifier = Modifier.fillMaxSize())
                 !bootstrapped -> WearLoadingPane(translationStore)
                 !loggedIn && !demoPreview -> WearPairingScreen(
+                    tokenStore = tokenStore,
                     translationStore = translationStore,
                     connectionStatus = connectionStatus,
                     onRetrySync = { scope.launch { applyBootstrapResult() } },
+                    onPaired = { refreshAuthState() },
                     onDemoPreview = if (com.eazpire.creator.wear.BuildConfig.DEBUG) {
                         { demoPreview = true }
                     } else {
