@@ -43,7 +43,7 @@ import com.eazpire.creator.wear.ui.WearUploadScreen
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-private const val SPLASH_MIN_MS = 1400L
+private const val SPLASH_MIN_MS = 2000L
 
 private enum class WearTab { Dashboard, Jobs, Upload }
 
@@ -79,6 +79,13 @@ fun WearApp(tokenStore: SecureTokenStore) {
         }
         if (result.loggedInAfter) {
             demoPreview = false
+        } else if (
+            com.eazpire.creator.wear.BuildConfig.DEBUG &&
+            result.connectedNodes == 0 &&
+            !tokenStore.isLoggedIn()
+        ) {
+            // Emulator without paired phone: show demo UI instead of empty pairing-only flow.
+            demoPreview = true
         }
         refreshAuthState()
         bootstrapped = true
