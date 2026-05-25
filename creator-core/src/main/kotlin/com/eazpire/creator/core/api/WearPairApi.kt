@@ -34,13 +34,25 @@ class WearPairApi(
         getJson("$baseUrl/api/wear-pair/session?token=${enc(token)}")
     }
 
+    /** Whether server-side pairing was revoked (phone logout). */
+    suspend fun deviceStatus(jwt: String, deviceId: String): JSONObject = withContext(Dispatchers.IO) {
+        getJson(
+            "$baseUrl/api/wear-pair/device-status?device_id=${enc(deviceId)}",
+            jwt,
+        )
+    }
+
     fun qrImageUrl(token: String): String =
         "$baseUrl/api/wear-pair/qr-image?token=${enc(token)}"
 
     private fun enc(v: String): String = java.net.URLEncoder.encode(v, "UTF-8")
 
-    private fun getJson(url: String): JSONObject {
-        val request = Request.Builder().url(url).get().build()
+    private fun getJson(url: String, jwt: String? = null): JSONObject {
+        val request = Request.Builder()
+            .url(url)
+            .apply { jwt?.let { addHeader("Authorization", "Bearer $it") } }
+            .get()
+            .build()
         val response = client.newCall(request).execute()
         return JSONObject(response.body?.string() ?: "{}")
     }

@@ -33,6 +33,7 @@ fun WearJobsScreen(
     translationStore: WearTranslationStore,
     refreshKey: Int,
     showTitle: Boolean = true,
+    activeOnly: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     val ownerId = remember(tokenStore) { tokenStore.getOwnerId().orEmpty() }
@@ -57,9 +58,16 @@ fun WearJobsScreen(
                         val o = arr.optJSONObject(i) ?: continue
                         val type = o.optString("type", o.optString("job_type", "job"))
                         val status = o.optString("status", o.optString("state", "—"))
+                        val done = o.optBoolean("done", false)
+                        val progress = o.optInt("progress", -1)
+                        if (activeOnly) {
+                            val s = status.lowercase()
+                            if (done || s == "done" || s == "completed" || s == "failed" || s == "error") continue
+                        }
                         val prompt = o.optString("prompt", o.optString("summary", "")).take(40)
                         val title = if (prompt.isNotBlank()) prompt else type
-                        add(WearJobRow(title, status))
+                        val statusLine = if (progress in 0..100) "$status · $progress%" else status
+                        add(WearJobRow(title, statusLine))
                     }
                 }
             }

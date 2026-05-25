@@ -15,15 +15,20 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.wear.compose.material.Scaffold
+import com.eazpire.creator.core.api.WearPairApi
 import com.eazpire.creator.core.auth.SecureTokenStore
 import com.eazpire.creator.core.auth.WearSessionGate
+import com.eazpire.creator.core.device.WearDeviceId
 import com.eazpire.creator.core.i18n.WearTranslationStore
 import com.eazpire.creator.wear.auth.WearAuthListenerService
 import com.eazpire.creator.wear.auth.bootstrapAuthFromPhone
 import com.eazpire.creator.wear.ui.WearMainShell
 import com.eazpire.creator.wear.ui.WearPairingScreen
 import com.eazpire.creator.wear.ui.WearSplashScreen
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.withContext
 
 private const val SPLASH_MIN_MS = 2000L
 
@@ -55,6 +60,24 @@ fun WearApp(
         val remaining = SPLASH_MIN_MS - (System.currentTimeMillis() - started)
         if (remaining > 0) delay(remaining)
         showSplash = false
+    }
+
+    LaunchedEffect(loggedIn) {
+        if (!loggedIn) return@LaunchedEffect
+        val jwt = tokenStore.getJwt()?.trim().orEmpty() ?: return@LaunchedEffect
+        val deviceId = WearDeviceId.get(context)
+        val pairApi = WearPairApi()
+        while (isActive) {
+            delay(30_000)
+            try {
+                val res = withContext(Dispatchers.IO) { pairApi.deviceStatus(jwt, deviceId) }
+                if (res.optBoolean("ok", false) && !res.optBoolean("active", true)) {
+                    WearSessionGate.clearSession(context, tokenStore)
+                    loggedIn = false
+                    break
+                }
+            } catch (_: Exception) { /* ignore */ }
+        }
     }
 
     DisposableEffect(context) {
