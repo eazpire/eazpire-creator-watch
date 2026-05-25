@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -107,49 +106,44 @@ fun WearMainShell(
                 .weight(1f)
                 .fillMaxWidth(),
         ) {
-            HorizontalPager(
-                state = pagerState,
-                modifier = Modifier.fillMaxSize(),
-                userScrollEnabled = false,
-            ) { page ->
-                when (page) {
-                    0 -> WearDashboardScreen(
-                        tokenStore = tokenStore,
-                        translationStore = translationStore,
-                        refreshKey = refreshKey,
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                    1 -> WearGeneratorScreen(
-                        tokenStore = tokenStore,
-                        translationStore = translationStore,
-                        refreshKey = refreshKey,
-                        onGenerationStarted = {
-                            jobsRefreshNonce++
-                            goToJobs()
-                        },
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                    2 -> WearDesignsScreen(
-                        tokenStore = tokenStore,
-                        translationStore = translationStore,
-                        refreshKey = refreshKey,
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                    3 -> WearProductsScreen(
-                        tokenStore = tokenStore,
-                        translationStore = translationStore,
-                        refreshKey = refreshKey,
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                    4 -> WearJobsScreen(
-                        tokenStore = tokenStore,
-                        translationStore = translationStore,
-                        refreshKey = refreshKey + jobsRefreshNonce,
-                        activeOnly = true,
-                        showTitle = false,
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                }
+            // Only mount the visible tab — avoids Designs polling + Products enrichment running together.
+            when (pagerState.currentPage) {
+                0 -> WearDashboardScreen(
+                    tokenStore = tokenStore,
+                    translationStore = translationStore,
+                    refreshKey = refreshKey,
+                    modifier = Modifier.fillMaxSize(),
+                )
+                1 -> WearGeneratorScreen(
+                    tokenStore = tokenStore,
+                    translationStore = translationStore,
+                    refreshKey = refreshKey,
+                    onGenerationStarted = {
+                        jobsRefreshNonce++
+                        goToJobs()
+                    },
+                    modifier = Modifier.fillMaxSize(),
+                )
+                2 -> WearDesignsScreen(
+                    tokenStore = tokenStore,
+                    translationStore = translationStore,
+                    refreshKey = refreshKey,
+                    modifier = Modifier.fillMaxSize(),
+                )
+                3 -> WearProductsScreen(
+                    tokenStore = tokenStore,
+                    translationStore = translationStore,
+                    refreshKey = refreshKey,
+                    modifier = Modifier.fillMaxSize(),
+                )
+                else -> WearJobsScreen(
+                    tokenStore = tokenStore,
+                    translationStore = translationStore,
+                    refreshKey = refreshKey + jobsRefreshNonce,
+                    activeOnly = true,
+                    showTitle = false,
+                    modifier = Modifier.fillMaxSize(),
+                )
             }
         }
     }

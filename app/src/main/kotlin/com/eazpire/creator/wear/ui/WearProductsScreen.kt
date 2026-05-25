@@ -42,15 +42,14 @@ fun WearProductsScreen(
     var loadError by remember { mutableStateOf<String?>(null) }
     var catalog by remember { mutableStateOf<List<WearCarouselItem>>(emptyList()) }
     var mockupCache by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
-    var previewCache by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
     var storefrontCache by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
     var searchDraft by remember { mutableStateOf("") }
     var appliedSearch by remember { mutableStateOf("") }
     var carouselIndex by remember { mutableIntStateOf(0) }
     val fetchingKeys = remember { mutableStateOf(setOf<String>()) }
 
-    val displayItems = remember(catalog, mockupCache, previewCache, storefrontCache) {
-        catalog.map { it.withResolvedImage(mockupCache, previewCache, storefrontCache) }
+    val displayItems = remember(catalog, mockupCache, storefrontCache) {
+        catalog.map { it.withResolvedImage(mockupCache, storefrontCache = storefrontCache) }
     }
 
     val speechLauncher = rememberLauncherForActivityResult(
@@ -88,39 +87,35 @@ fun WearProductsScreen(
 
     suspend fun enrichImagesFor(items: List<WearCarouselItem>) = coroutineScope {
         if (ownerId.isBlank() || items.isEmpty()) return@coroutineScope
-        val need = items.filter { it.needsWearImageEnrichment(mockupCache, previewCache, storefrontCache) }
+        val need = items.filter { it.needsWearImageEnrichment(mockupCache, emptyMap(), storefrontCache) }
         if (need.isEmpty()) return@coroutineScope
 
         val mockKeys = need.mapNotNull { it.productKey }.distinct()
-        val designIds = need.mapNotNull { it.designId }.distinct()
-        val handles = need.mapNotNull { it.shopifyHandle }.distinct()
+        val handles = need.mapNotNull { it.shopifyHandle }.distinct().take(6)
 
         val mockDeferred = async(Dispatchers.IO) {
             if (mockKeys.isEmpty()) emptyMap()
             else fetchWearProductMockups(api, ownerId, mockKeys)
         }
-        val previewDeferred = async(Dispatchers.IO) {
-            if (designIds.isEmpty()) emptyMap()
-            else fetchWearDesignPreviews(api, ownerId, designIds)
-        }
         val storefrontDeferred = async(Dispatchers.IO) {
-            if (handles.isEmpty()) emptyMap()
-            else withContext(Dispatchers.IO) {
-                handles.map { handle ->
-                    async {
-                        val url = fetchWearStorefrontImage(handle)
-                        if (url != null) handle to url else null
-                    }
-                }.awaitAll().filterNotNull().toMap()
+            if (handles.isEmpty()) {
+                emptyMap()
+            } else {
+                coroutineScope {
+                    handles.map { handle ->
+                        async {
+                            val url = fetchWearStorefrontImage(handle)
+                            if (url != null) handle to url else null
+                        }
+                    }.awaitAll().filterNotNull().toMap()
+                }
             }
         }
 
         val mockLoaded = mockDeferred.await()
-        val previewLoaded = previewDeferred.await()
         val storefrontLoaded = storefrontDeferred.await()
 
         if (mockLoaded.isNotEmpty()) mockupCache = mockupCache + mockLoaded
-        if (previewLoaded.isNotEmpty()) previewCache = previewCache + previewLoaded
         if (storefrontLoaded.isNotEmpty()) storefrontCache = storefrontCache + storefrontLoaded
     }
 
@@ -151,7 +146,6 @@ fun WearProductsScreen(
         }
         loading = true
         mockupCache = emptyMap()
-        previewCache = emptyMap()
         storefrontCache = emptyMap()
         fetchingKeys.value = emptySet()
         carouselIndex = 0
@@ -167,12 +161,16 @@ fun WearProductsScreen(
                     loadError = probe.optString("error", "load_failed")
                 }
             }
-            enrichImagesFor(catalog.take(WEAR_PRODUCT_MOCKUP_PREFETCH))
+            val initial = catalog.take(WEAR_PRODUCT_MOCKUP_PREFETCH)
+            loading = false
+            if (initial.isNotEmpty()) {
+                enrichImagesFor(initial)
+            }
         } catch (e: Exception) {
             catalog = emptyList()
             loadError = e.message ?: "load_failed"
+            loading = false
         }
-        loading = false
     }
 
     LaunchedEffect(carouselIndex, appliedSearch, catalog.size, loading) {

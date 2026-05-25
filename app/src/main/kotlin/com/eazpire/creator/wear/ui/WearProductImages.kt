@@ -51,7 +51,10 @@ internal fun convertWearShopifyImageUrl(shopifyUrl: String?): String? {
     }
 }
 
-internal fun resolvePublishedProductImage(obj: JSONObject): String? {
+internal fun resolvePublishedProductImage(
+    obj: JSONObject,
+    includeDesignPreview: Boolean = false,
+): String? {
     fun fromAny(v: Any?): String? = when (v) {
         is String -> v.takeIf { it.isNotBlank() }
         is JSONObject -> v.optString("src", "").takeIf { it.isNotBlank() }
@@ -59,12 +62,12 @@ internal fun resolvePublishedProductImage(obj: JSONObject): String? {
         else -> null
     }
     val mockup = fromAny(obj.opt("mockup_image"))
-    val preview = fromAny(obj.opt("preview_image"))
+    val preview = if (includeDesignPreview) fromAny(obj.opt("preview_image")) else null
     val featured = fromAny(obj.opt("featured_image"))
     val resolved = normalizeWearImageUrl(
         mockup
-            ?: preview
             ?: convertWearShopifyImageUrl(featured)
+            ?: preview
             ?: fromAny(obj.opt("image_url"))
             ?: fromAny(obj.opt("preview_url"))
             ?: fromAny(obj.opt("thumbnail_url"))
@@ -180,16 +183,12 @@ internal fun WearCarouselItem.resolvedProductImage(
     mockupCache: Map<String, String>,
     previewCache: Map<String, String> = emptyMap(),
     storefrontCache: Map<String, String> = emptyMap(),
+    allowDesignPreview: Boolean = false,
 ): String? {
     val pk = productKey?.trim().orEmpty()
     if (pk.isNotBlank()) {
         val mock = mockupCache[pk]
         if (isWearLoadableImageUrl(mock)) return normalizeWearImageUrl(mock)
-    }
-    val did = designId?.trim().orEmpty()
-    if (did.isNotBlank()) {
-        val preview = previewCache[did]
-        if (isWearLoadableImageUrl(preview)) return normalizeWearImageUrl(preview)
     }
     val handle = shopifyHandle?.trim().orEmpty()
     if (handle.isNotBlank()) {
@@ -203,8 +202,9 @@ internal fun WearCarouselItem.withResolvedImage(
     mockupCache: Map<String, String>,
     previewCache: Map<String, String> = emptyMap(),
     storefrontCache: Map<String, String> = emptyMap(),
+    allowDesignPreview: Boolean = false,
 ): WearCarouselItem {
-    val url = resolvedProductImage(mockupCache, previewCache, storefrontCache)
+    val url = resolvedProductImage(mockupCache, previewCache, storefrontCache, allowDesignPreview)
     return if (url == imageUrl) this else copy(imageUrl = url)
 }
 
@@ -212,4 +212,7 @@ internal fun WearCarouselItem.needsWearImageEnrichment(
     mockupCache: Map<String, String>,
     previewCache: Map<String, String>,
     storefrontCache: Map<String, String>,
-): Boolean = !isWearLoadableImageUrl(resolvedProductImage(mockupCache, previewCache, storefrontCache))
+    allowDesignPreview: Boolean = false,
+): Boolean = !isWearLoadableImageUrl(
+    resolvedProductImage(mockupCache, previewCache, storefrontCache, allowDesignPreview),
+)
