@@ -41,6 +41,10 @@ class CreatorPhoneUploadApi(
     fun qrImageUrl(sessionId: String): String =
         "$baseUrl/api/creator-phone-upload/qr-image?session=${enc(sessionId)}"
 
+    /** Plain QR fallback — same as web [creator-phone-upload-modal.js] qrCodeUrlForScan. */
+    fun qrFallbackUrl(scanUrl: String): String =
+        "https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=1&qzone=1&data=${enc(scanUrl)}"
+
     private fun enc(v: String): String = java.net.URLEncoder.encode(v, "UTF-8")
 
     private fun getJson(url: String): JSONObject {

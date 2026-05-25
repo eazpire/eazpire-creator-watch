@@ -21,7 +21,10 @@ import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
 import com.eazpire.creator.core.api.CreatorApi
 import com.eazpire.creator.core.auth.SecureTokenStore
 import com.eazpire.creator.core.i18n.WearTranslationStore
+import com.eazpire.creator.wear.EazColors
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 
@@ -41,41 +44,61 @@ fun WearJobsScreen(
     var loading by remember { mutableStateOf(true) }
     var jobs by remember { mutableStateOf<List<WearJobRow>>(emptyList()) }
 
-    LaunchedEffect(ownerId, refreshKey) {
+    suspend fun loadJobs() {
         if (ownerId.isBlank()) {
-            loading = false
             jobs = emptyList()
-            return@LaunchedEffect
+            return
         }
-        loading = true
-        try {
-            val rows = withContext(Dispatchers.IO) {
-                val res = api.listJobs(ownerId, limit = 10)
-                if (!res.optBoolean("ok", false)) return@withContext emptyList()
-                val arr: JSONArray = res.optJSONArray("items") ?: JSONArray()
-                buildList {
-                    for (i in 0 until arr.length()) {
-                        val o = arr.optJSONObject(i) ?: continue
-                        val type = o.optString("type", o.optString("job_type", "job"))
-                        val status = o.optString("status", o.optString("state", "—"))
-                        val done = o.optBoolean("done", false)
-                        val progress = o.optInt("progress", -1)
-                        if (activeOnly) {
-                            val s = status.lowercase()
-                            if (done || s == "done" || s == "completed" || s == "failed" || s == "error") continue
-                        }
-                        val prompt = o.optString("prompt", o.optString("summary", "")).take(40)
-                        val title = if (prompt.isNotBlank()) prompt else type
-                        val statusLine = if (progress in 0..100) "$status · $progress%" else status
-                        add(WearJobRow(title, statusLine))
+        val rows = withContext(Dispatchers.IO) {
+            val res = api.listJobs(ownerId, limit = 15)
+            if (!res.optBoolean("ok", false)) return@withContext emptyList()
+            val arr: JSONArray = res.optJSONArray("items") ?: JSONArray()
+            buildList {
+                for (i in 0 until arr.length()) {
+                    val o = arr.optJSONObject(i) ?: continue
+                    val done = o.optBoolean("done", false)
+                    val message = o.optString("message", "").trim()
+                    val progress = o.optInt("progress", -1)
+                    val saving = o.optBoolean("saving", false)
+                    if (activeOnly) {
+                        if (done) continue
+                        val msgLower = message.lowercase()
+                        if (msgLower.contains("failed") || msgLower.contains("error")) continue
                     }
+                    val prompt = o.optString("prompt", o.optString("final_prompt", "")).take(36)
+                    val type = o.optString("type", o.optString("action", "job"))
+                    val title = if (prompt.isNotBlank()) prompt else type
+                    val statusLine = when {
+                        saving && !done -> "Saving…"
+                        progress in 0..100 && message.isNotBlank() -> "$message · $progress%"
+                        progress in 0..100 -> "$progress%"
+                        message.isNotBlank() -> message
+                        done -> "Done"
+                        else -> "Processing…"
+                    }
+                    add(WearJobRow(title, statusLine))
                 }
             }
-            jobs = rows
+        }
+        jobs = rows
+    }
+
+    LaunchedEffect(ownerId, refreshKey, activeOnly) {
+        loading = true
+        try {
+            loadJobs()
         } catch (_: Exception) {
             jobs = emptyList()
         }
         loading = false
+        if (activeOnly) {
+            while (isActive) {
+                delay(4000)
+                try {
+                    loadJobs()
+                } catch (_: Exception) { /* ignore */ }
+            }
+        }
     }
 
     val listState = rememberScalingLazyListState(initialCenterItemIndex = 0)
@@ -97,7 +120,7 @@ fun WearJobsScreen(
                 )
             }
         }
-        if (loading) {
+        if (loading && jobs.isEmpty()) {
             item { CircularProgressIndicator() }
         } else if (jobs.isEmpty()) {
             item {
@@ -105,7 +128,7 @@ fun WearJobsScreen(
                     text = "No active jobs",
                     style = MaterialTheme.typography.body2,
                     textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
                 )
             }
         } else {
@@ -114,7 +137,8 @@ fun WearJobsScreen(
                 Text(
                     text = "${job.title}\n${job.status}",
                     style = MaterialTheme.typography.body2,
-                    modifier = Modifier.fillMaxWidth()
+                    color = EazColors.TextPrimary,
+                    modifier = Modifier.fillMaxWidth(),
                 )
             }
         }

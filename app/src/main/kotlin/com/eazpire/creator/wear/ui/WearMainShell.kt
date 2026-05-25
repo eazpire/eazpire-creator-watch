@@ -1,29 +1,36 @@
 package com.eazpire.creator.wear.ui
 
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.wear.compose.material.Chip
-import androidx.wear.compose.material.ChipDefaults
 import androidx.wear.compose.material.MaterialTheme
 import androidx.wear.compose.material.Text
 import com.eazpire.creator.core.auth.SecureTokenStore
 import com.eazpire.creator.core.i18n.WearTranslationStore
 import com.eazpire.creator.wear.EazColors
+import kotlin.math.abs
+import kotlinx.coroutines.launch
 
 private const val PAGE_COUNT = 5
+private const val PAGE_JOBS = 4
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -34,6 +41,9 @@ fun WearMainShell(
     modifier: Modifier = Modifier,
 ) {
     val pagerState = rememberPagerState(pageCount = { PAGE_COUNT })
+    val scope = rememberCoroutineScope()
+    var jobsRefreshNonce by remember { mutableIntStateOf(0) }
+
     val pageLabels = remember(translationStore) {
         listOf(
             translationStore.t("wear.dashboard", "Dashboard"),
@@ -45,39 +55,52 @@ fun WearMainShell(
     }
     val currentLabel = pageLabels.getOrElse(pagerState.currentPage) { "" }
 
+    fun goToJobs() {
+        scope.launch {
+            pagerState.animateScrollToPage(PAGE_JOBS)
+        }
+    }
+
     Column(
         modifier = modifier
             .fillMaxSize()
             .wearRoundSafePadding(),
     ) {
-        Chip(
-            onClick = { },
-            enabled = false,
-            label = {
-                Text(
-                    text = currentLabel,
-                    maxLines = 1,
-                    style = MaterialTheme.typography.caption1,
-                )
-            },
-            colors = ChipDefaults.chipColors(
-                backgroundColor = EazColors.Orange,
-                contentColor = EazColors.TextPrimary,
-                disabledBackgroundColor = EazColors.Orange,
-                disabledContentColor = EazColors.TextPrimary,
-            ),
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(32.dp),
-        )
-
-        WearPageDots(
-            pageCount = PAGE_COUNT,
-            currentPage = pagerState.currentPage,
-            modifier = Modifier
-                .align(Alignment.CenterHorizontally)
-                .padding(top = 4.dp, bottom = 4.dp),
-        )
+                .pointerInput(pagerState.currentPage) {
+                    detectHorizontalDragGestures { _, drag ->
+                        if (abs(drag) < 36f) return@detectHorizontalDragGestures
+                        scope.launch {
+                            when {
+                                drag < 0 && pagerState.currentPage < PAGE_COUNT - 1 ->
+                                    pagerState.animateScrollToPage(pagerState.currentPage + 1)
+                                drag > 0 && pagerState.currentPage > 0 ->
+                                    pagerState.animateScrollToPage(pagerState.currentPage - 1)
+                            }
+                        }
+                    }
+                },
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+        ) {
+            Text(
+                text = currentLabel,
+                style = MaterialTheme.typography.caption1,
+                color = EazColors.TextPrimary,
+                textAlign = TextAlign.Center,
+                maxLines = 1,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 2.dp, bottom = 2.dp),
+            )
+            WearPageDots(
+                pageCount = PAGE_COUNT,
+                currentPage = pagerState.currentPage,
+                modifier = Modifier.padding(bottom = 4.dp),
+            )
+        }
 
         Box(
             modifier = Modifier
@@ -87,6 +110,7 @@ fun WearMainShell(
             HorizontalPager(
                 state = pagerState,
                 modifier = Modifier.fillMaxSize(),
+                userScrollEnabled = false,
             ) { page ->
                 when (page) {
                     0 -> WearDashboardScreen(
@@ -99,6 +123,10 @@ fun WearMainShell(
                         tokenStore = tokenStore,
                         translationStore = translationStore,
                         refreshKey = refreshKey,
+                        onGenerationStarted = {
+                            jobsRefreshNonce++
+                            goToJobs()
+                        },
                         modifier = Modifier.fillMaxSize(),
                     )
                     2 -> WearDesignsScreen(
@@ -116,8 +144,9 @@ fun WearMainShell(
                     4 -> WearJobsScreen(
                         tokenStore = tokenStore,
                         translationStore = translationStore,
-                        refreshKey = refreshKey,
+                        refreshKey = refreshKey + jobsRefreshNonce,
                         activeOnly = true,
+                        showTitle = false,
                         modifier = Modifier.fillMaxSize(),
                     )
                 }

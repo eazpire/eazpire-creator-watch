@@ -38,37 +38,76 @@ fun WearCarouselScreen(
     items: List<WearCarouselItem>,
     loading: Boolean,
     emptyText: String,
+    searchQuery: String = "",
+    onSearchQueryChange: (String) -> Unit = {},
+    onVoiceSearch: () -> Unit = {},
+    searchPlaceholder: String = "Search…",
+    showSearch: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
-    var index by remember(items) { mutableIntStateOf(0) }
-    val total = items.size
-    val current = items.getOrNull(index.coerceIn(0, (total - 1).coerceAtLeast(0)))
+    var index by remember(items, searchQuery) { mutableIntStateOf(0) }
+    val filtered = remember(items, searchQuery) {
+        val q = searchQuery.trim()
+        if (q.isBlank()) items
+        else items.filter {
+            it.label?.contains(q, ignoreCase = true) == true ||
+                it.imageUrl?.contains(q, ignoreCase = true) == true
+        }
+    }
+    val total = filtered.size
+    val safeIndex = index.coerceIn(0, (total - 1).coerceAtLeast(0))
+    if (safeIndex != index) index = safeIndex
+    val current = filtered.getOrNull(safeIndex)
 
     Column(
         modifier = modifier
             .fillMaxSize()
             .wearRoundSafePadding(),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
     ) {
-        when {
-            loading -> CircularProgressIndicator()
-            total == 0 -> Text(
-                text = emptyText,
-                style = MaterialTheme.typography.body2,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.padding(12.dp),
+        if (showSearch) {
+            WearSearchBar(
+                query = searchQuery,
+                onQueryChange = {
+                    onSearchQueryChange(it)
+                    index = 0
+                },
+                onVoiceClick = onVoiceSearch,
+                placeholder = searchPlaceholder,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 4.dp),
             )
+        }
+
+        when {
+            loading -> Box(
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+                contentAlignment = Alignment.Center,
+            ) {
+                CircularProgressIndicator()
+            }
+            total == 0 -> Box(
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = emptyText,
+                    style = MaterialTheme.typography.body2,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(12.dp),
+                )
+            }
             else -> {
                 Box(
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxWidth()
-                        .pointerInput(total, index) {
+                        .pointerInput(total, safeIndex) {
                             detectHorizontalDragGestures { _, drag ->
                                 if (abs(drag) < 28f) return@detectHorizontalDragGestures
-                                if (drag < 0 && index < total - 1) index++
-                                if (drag > 0 && index > 0) index--
+                                if (drag < 0 && safeIndex < total - 1) index++
+                                if (drag > 0 && safeIndex > 0) index--
                             }
                         },
                     contentAlignment = Alignment.Center,
@@ -78,7 +117,7 @@ fun WearCarouselScreen(
                         AsyncImage(
                             model = url,
                             contentDescription = current.label,
-                            modifier = Modifier.size(96.dp),
+                            modifier = Modifier.size(88.dp),
                             contentScale = ContentScale.Fit,
                         )
                     } else {
@@ -89,12 +128,12 @@ fun WearCarouselScreen(
                         )
                     }
                 }
-                WearPageDots(pageCount = total, currentPage = index)
+                WearPageDots(pageCount = total, currentPage = safeIndex)
                 Text(
-                    text = "${index + 1}/$total",
+                    text = "${safeIndex + 1}/$total",
                     style = MaterialTheme.typography.caption2,
                     color = EazColors.TextPrimary.copy(alpha = 0.8f),
-                    modifier = Modifier.padding(top = 4.dp),
+                    modifier = Modifier.padding(top = 2.dp, bottom = 2.dp),
                 )
             }
         }

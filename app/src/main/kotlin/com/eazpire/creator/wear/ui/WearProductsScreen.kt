@@ -1,5 +1,9 @@
 package com.eazpire.creator.wear.ui
 
+import android.content.Intent
+import android.speech.RecognizerIntent
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -11,6 +15,8 @@ import com.eazpire.creator.core.api.CreatorApi
 import com.eazpire.creator.core.auth.SecureTokenStore
 import com.eazpire.creator.core.i18n.WearTranslationStore
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 
@@ -25,6 +31,28 @@ fun WearProductsScreen(
     val api = remember(tokenStore) { CreatorApi(jwt = tokenStore.getJwt()) }
     var loading by remember { mutableStateOf(true) }
     var items by remember { mutableStateOf<List<WearCarouselItem>>(emptyList()) }
+    var searchQuery by remember { mutableStateOf("") }
+
+    val speechLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult(),
+    ) { result ->
+        if (result.resultCode == android.app.Activity.RESULT_OK) {
+            val text = result.data
+                ?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
+                ?.firstOrNull()
+                ?.trim()
+            if (!text.isNullOrBlank()) searchQuery = text
+        }
+    }
+
+    fun launchVoice() {
+        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+        }
+        try {
+            speechLauncher.launch(intent)
+        } catch (_: Exception) { /* ignore */ }
+    }
 
     LaunchedEffect(ownerId, refreshKey) {
         if (ownerId.isBlank()) {
@@ -58,6 +86,11 @@ fun WearProductsScreen(
         items = items,
         loading = loading,
         emptyText = translationStore.t("wear.no_products", "No products yet"),
+        searchQuery = searchQuery,
+        onSearchQueryChange = { searchQuery = it },
+        onVoiceSearch = { launchVoice() },
+        searchPlaceholder = translationStore.t("wear.search_products", "Search products…"),
+        showSearch = true,
         modifier = modifier,
     )
 }
