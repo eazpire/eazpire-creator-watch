@@ -134,8 +134,7 @@ fun WearJobsScreen(
                     val done = o.optBoolean("done", false)
                     val saving = o.optBoolean("saving", false)
                     val saved = o.optBoolean("saved", false)
-                    // Keep jobs while generating or saving (web shows this too; done alone hides too early).
-                    if (activeOnly && done && !saving && saved) continue
+                    if (activeOnly && (done && !(saving && !saved))) continue
                     val message = o.optString("message", "").trim()
                     val progress = o.optInt("progress", -1).coerceIn(-1, 100)
                     val type = o.optString("type", o.optString("action", ""))
