@@ -79,7 +79,6 @@ fun WearMainShell(
                     tokenStore = tokenStore,
                     translationStore = translationStore,
                     refreshKey = refreshKey,
-                    useDemoData = false,
                     showTitle = false,
                     modifier = Modifier.fillMaxSize(),
                 )
@@ -87,7 +86,6 @@ fun WearMainShell(
                     tokenStore = tokenStore,
                     translationStore = translationStore,
                     refreshKey = refreshKey,
-                    useDemoData = false,
                     showTitle = false,
                     modifier = Modifier.fillMaxSize(),
                 )
@@ -95,7 +93,6 @@ fun WearMainShell(
                     tokenStore = tokenStore,
                     translationStore = translationStore,
                     refreshKey = refreshKey,
-                    useDemoData = false,
                     showTitle = false,
                     modifier = Modifier.fillMaxSize(),
                 )

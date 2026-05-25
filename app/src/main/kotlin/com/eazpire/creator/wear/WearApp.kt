@@ -16,6 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.wear.compose.material.Scaffold
 import com.eazpire.creator.core.auth.SecureTokenStore
+import com.eazpire.creator.core.auth.WearSessionGate
 import com.eazpire.creator.core.i18n.WearTranslationStore
 import com.eazpire.creator.wear.auth.WearAuthListenerService
 import com.eazpire.creator.wear.auth.bootstrapAuthFromPhone
@@ -34,17 +35,20 @@ fun WearApp(
     val context = LocalContext.current
     val translationStore = remember { WearTranslationStore() }
     var showSplash by remember { mutableStateOf(true) }
-    var loggedIn by remember { mutableStateOf(tokenStore.isLoggedIn()) }
+    WearSessionGate.ensureSchema(context, tokenStore)
+    var loggedIn by remember {
+        mutableStateOf(WearSessionGate.isSessionReady(context, tokenStore))
+    }
     var refreshKey by remember { mutableIntStateOf(0) }
 
     fun refreshAuthState() {
-        loggedIn = tokenStore.isLoggedIn()
+        loggedIn = WearSessionGate.isSessionReady(context, tokenStore)
         if (loggedIn) refreshKey++
     }
 
     LaunchedEffect(Unit) {
         val started = System.currentTimeMillis()
-        if (!tokenStore.isLoggedIn()) {
+        if (!WearSessionGate.isSessionReady(context, tokenStore)) {
             bootstrapAuthFromPhone(context, tokenStore)
             refreshAuthState()
         }

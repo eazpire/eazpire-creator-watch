@@ -29,7 +29,6 @@ fun WearDashboardScreen(
     tokenStore: SecureTokenStore,
     translationStore: WearTranslationStore,
     refreshKey: Int,
-    useDemoData: Boolean = false,
     showTitle: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
@@ -38,12 +37,7 @@ fun WearDashboardScreen(
     var loading by remember { mutableStateOf(true) }
     var lines by remember { mutableStateOf<List<String>>(emptyList()) }
 
-    LaunchedEffect(ownerId, refreshKey, useDemoData) {
-        if (useDemoData) {
-            loading = false
-            lines = WearDemo.dashboardLines
-            return@LaunchedEffect
-        }
+    LaunchedEffect(ownerId, refreshKey) {
         if (ownerId.isBlank()) {
             loading = false
             lines = emptyList()

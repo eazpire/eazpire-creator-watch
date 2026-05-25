@@ -32,7 +32,6 @@ fun WearJobsScreen(
     tokenStore: SecureTokenStore,
     translationStore: WearTranslationStore,
     refreshKey: Int,
-    useDemoData: Boolean = false,
     showTitle: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
@@ -41,12 +40,7 @@ fun WearJobsScreen(
     var loading by remember { mutableStateOf(true) }
     var jobs by remember { mutableStateOf<List<WearJobRow>>(emptyList()) }
 
-    LaunchedEffect(ownerId, refreshKey, useDemoData) {
-        if (useDemoData) {
-            loading = false
-            jobs = WearDemo.jobs
-            return@LaunchedEffect
-        }
+    LaunchedEffect(ownerId, refreshKey) {
         if (ownerId.isBlank()) {
             loading = false
             jobs = emptyList()

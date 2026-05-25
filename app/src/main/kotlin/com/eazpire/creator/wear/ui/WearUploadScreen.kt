@@ -41,26 +41,14 @@ fun WearUploadScreen(
     tokenStore: SecureTokenStore,
     translationStore: WearTranslationStore,
     refreshKey: Int,
-    useDemoData: Boolean = false,
     showTitle: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
     val ownerId = remember(tokenStore) { tokenStore.getOwnerId().orEmpty() }
     val uploadApi = remember { CreatorPhoneUploadApi() }
-    var state by remember(useDemoData) {
-        mutableStateOf<UploadUiState>(
-            if (useDemoData) {
-                UploadUiState.Error(
-                    translationStore.t("wear.upload_demo", "Log in on phone for QR"),
-                )
-            } else {
-                UploadUiState.Loading
-            },
-        )
-    }
+    var state by remember { mutableStateOf<UploadUiState>(UploadUiState.Loading) }
 
-    LaunchedEffect(ownerId, refreshKey, useDemoData) {
-        if (useDemoData) return@LaunchedEffect
+    LaunchedEffect(ownerId, refreshKey) {
         if (ownerId.isBlank()) {
             state = UploadUiState.Error("Not logged in")
             return@LaunchedEffect

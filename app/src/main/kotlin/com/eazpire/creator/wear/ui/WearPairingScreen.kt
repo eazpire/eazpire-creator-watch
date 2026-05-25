@@ -1,7 +1,9 @@
 package com.eazpire.creator.wear.ui
 
 import android.os.Build
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -21,10 +23,10 @@ import androidx.compose.ui.unit.dp
 import androidx.wear.compose.material.CircularProgressIndicator
 import androidx.wear.compose.material.MaterialTheme
 import androidx.wear.compose.material.Text
-import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import coil.compose.AsyncImage
 import com.eazpire.creator.core.api.WearPairApi
 import com.eazpire.creator.core.auth.SecureTokenStore
+import com.eazpire.creator.core.auth.WearSessionGate
 import com.eazpire.creator.core.device.WearDeviceId
 import com.eazpire.creator.core.i18n.WearTranslationStore
 import com.eazpire.creator.wear.EazColors
@@ -35,12 +37,10 @@ import kotlinx.coroutines.withContext
 private sealed class PairUiState {
     data object Loading : PairUiState()
     data class Qr(val qrUrl: String) : PairUiState()
-    data class Error(val message: String) : PairUiState()
+    data object Error : PairUiState()
 }
 
-/**
- * Login gate: QR only (no demo / retry chips). Polls until phone claims session or Data Layer sync logs in.
- */
+/** Full-screen QR login — no tabs, no demo, no extra chips. */
 @Composable
 fun WearPairingScreen(
     tokenStore: SecureTokenStore,
@@ -67,14 +67,14 @@ fun WearPairingScreen(
                 pairApi.createSession(deviceId, deviceName)
             }
             if (!session.optBoolean("ok", false)) {
-                state = PairUiState.Error(session.optString("error", "session_failed"))
+                state = PairUiState.Error
                 delay(4000)
                 sessionGeneration++
                 return@LaunchedEffect
             }
             val token = session.optString("token", "").trim()
             if (token.isBlank()) {
-                state = PairUiState.Error("missing_token")
+                state = PairUiState.Error
                 delay(4000)
                 sessionGeneration++
                 return@LaunchedEffect
@@ -84,7 +84,7 @@ fun WearPairingScreen(
 
             while (true) {
                 delay(2500)
-                if (tokenStore.isLoggedIn()) {
+                if (WearSessionGate.isSessionReady(context, tokenStore)) {
                     onPaired()
                     break
                 }
@@ -95,6 +95,7 @@ fun WearPairingScreen(
                         val ownerId = poll.optString("owner_id", "").trim()
                         if (jwt.isNotBlank() && ownerId.isNotBlank()) {
                             tokenStore.saveJwt(jwt, ownerId)
+                            WearSessionGate.markSessionReady(context)
                             onPaired()
                         }
                         break
@@ -105,47 +106,51 @@ fun WearPairingScreen(
                     }
                 }
             }
-        } catch (e: Exception) {
-            state = PairUiState.Error(e.message ?: "error")
+        } catch (_: Exception) {
+            state = PairUiState.Error
             delay(4000)
             sessionGeneration++
         }
     }
 
-    ScalingLazyColumn(
-        modifier = modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(horizontal = 8.dp, vertical = 10.dp),
+        contentAlignment = Alignment.Center,
     ) {
-        item {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
             Text(
                 text = translationStore.t(
                     "wear.pair_qr_hint",
-                    "Log in with the Eazpire app: Creator Settings → Creator Wear → Connect",
+                    "Eazpire app → Creator Settings → Creator Wear → Connect",
                 ),
                 style = MaterialTheme.typography.caption2,
                 color = EazColors.TextSecondary,
                 textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 6.dp),
             )
-        }
-        when (val s = state) {
-            PairUiState.Loading -> item { CircularProgressIndicator() }
-            is PairUiState.Qr -> item {
-                AsyncImage(
+            when (val s = state) {
+                PairUiState.Loading -> CircularProgressIndicator()
+                PairUiState.Error -> {
+                    CircularProgressIndicator()
+                    Text(
+                        text = translationStore.t("wear.pair_qr_error", "Loading QR…"),
+                        style = MaterialTheme.typography.caption3,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(top = 6.dp),
+                    )
+                }
+                is PairUiState.Qr -> AsyncImage(
                     model = s.qrUrl,
                     contentDescription = "Pairing QR",
-                    modifier = Modifier.size(150.dp),
+                    modifier = Modifier.size(160.dp),
                     contentScale = ContentScale.Fit,
-                )
-            }
-            is PairUiState.Error -> item {
-                CircularProgressIndicator()
-                Text(
-                    text = translationStore.t("wear.pair_qr_error", "Could not start pairing"),
-                    style = MaterialTheme.typography.caption2,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
                 )
             }
         }

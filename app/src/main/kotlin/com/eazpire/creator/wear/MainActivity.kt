@@ -10,6 +10,7 @@ import androidx.compose.ui.Modifier
 import androidx.lifecycle.lifecycleScope
 import androidx.wear.ambient.AmbientLifecycleObserver
 import com.eazpire.creator.core.auth.SecureTokenStore
+import com.eazpire.creator.core.auth.WearSessionGate
 import com.eazpire.creator.wear.auth.WearAuthListenerService
 import com.eazpire.creator.wear.auth.bootstrapAuthFromPhone
 import kotlinx.coroutines.launch
@@ -41,6 +42,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         applyFullscreenWindow()
         tokenStore = SecureTokenStore(this)
+        WearSessionGate.ensureSchema(this, tokenStore)
         lifecycle.addObserver(ambientObserver)
 
         setContent {
@@ -59,7 +61,7 @@ class MainActivity : ComponentActivity() {
         if (!::tokenStore.isInitialized) return
         lifecycleScope.launch {
             bootstrapAuthFromPhone(this@MainActivity, tokenStore)
-            if (tokenStore.isLoggedIn()) {
+            if (WearSessionGate.isSessionReady(this@MainActivity, tokenStore)) {
                 sendBroadcast(
                     android.content.Intent(WearAuthListenerService.ACTION_AUTH_CHANGED)
                         .setPackage(packageName),
