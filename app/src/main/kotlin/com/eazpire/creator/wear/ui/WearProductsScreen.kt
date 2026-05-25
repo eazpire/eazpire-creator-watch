@@ -30,11 +30,16 @@ fun WearProductsScreen(
     refreshKey: Int,
     modifier: Modifier = Modifier,
 ) {
-    val ownerId = remember(tokenStore) { tokenStore.getOwnerId().orEmpty() }
+    var ownerId by remember { mutableStateOf(tokenStore.getOwnerId().orEmpty()) }
     val api = remember(tokenStore) { CreatorApi(jwt = tokenStore.getJwt()) }
     val scope = rememberCoroutineScope()
 
+    androidx.compose.runtime.LaunchedEffect(tokenStore, refreshKey) {
+        ownerId = tokenStore.getOwnerId().orEmpty()
+    }
+
     var loading by remember { mutableStateOf(true) }
+    var loadError by remember { mutableStateOf<String?>(null) }
     var catalog by remember { mutableStateOf<List<WearCarouselItem>>(emptyList()) }
     var mockupCache by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
     var previewCache by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
@@ -150,11 +155,22 @@ fun WearProductsScreen(
         storefrontCache = emptyMap()
         fetchingKeys.value = emptySet()
         carouselIndex = 0
+        loadError = null
         try {
-            catalog = withContext(Dispatchers.IO) { loadWearProductCatalog(api, ownerId) }
+            val loaded = withContext(Dispatchers.IO) { loadWearProductCatalog(api, ownerId) }
+            catalog = loaded
+            if (loaded.isEmpty()) {
+                val probe = withContext(Dispatchers.IO) {
+                    api.getPublishedProducts(ownerId, limit = 1, wearFast = true)
+                }
+                if (!probe.optBoolean("ok", false)) {
+                    loadError = probe.optString("error", "load_failed")
+                }
+            }
             enrichImagesFor(catalog.take(WEAR_PRODUCT_MOCKUP_PREFETCH))
-        } catch (_: Exception) {
+        } catch (e: Exception) {
             catalog = emptyList()
+            loadError = e.message ?: "load_failed"
         }
         loading = false
     }
@@ -168,7 +184,9 @@ fun WearProductsScreen(
     WearCarouselScreen(
         items = displayItems,
         loading = loading,
-        emptyText = translationStore.t("wear.no_products", "No products yet"),
+        emptyText = loadError?.let {
+            translationStore.t("wear.products_load_error", "Could not load products")
+        } ?: translationStore.t("wear.no_products", "No products yet"),
         searchText = searchDraft,
         onSearchTextChange = { searchDraft = it },
         onSearchSubmit = { appliedSearch = searchDraft.trim() },

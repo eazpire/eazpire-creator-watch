@@ -38,6 +38,7 @@ fun WearDesignsScreen(
     val context = LocalContext.current
     val ownerId = remember(tokenStore) { tokenStore.getOwnerId().orEmpty() }
     val api = remember(tokenStore) { CreatorApi(jwt = tokenStore.getJwt()) }
+    val economy = rememberWearEconomySnapshot(api, ownerId, refreshKey)
     val uploadApi = remember { CreatorPhoneUploadApi() }
     val pendingStore = remember(context) { WearPendingUploadStore(context) }
     val uploadController = remember(uploadApi, translationStore) {
@@ -308,7 +309,10 @@ fun WearDesignsScreen(
         }
     }
 
+    val showMainUi = uploadController.state is WearPhoneUploadState.Hidden
+
     Box(modifier = modifier.fillMaxSize()) {
+        if (showMainUi) {
         WearCarouselScreen(
             items = items,
             loading = loading || uploading,
@@ -338,6 +342,7 @@ fun WearDesignsScreen(
             },
             modifier = Modifier.fillMaxSize(),
         )
+        }
 
         WearDesignLibraryActionsHost(
             item = selectedDesign,
@@ -357,6 +362,7 @@ fun WearDesignsScreen(
         WearPhoneUploadOverlay(
             controller = uploadController,
             translationStore = translationStore,
+            economy = economy,
             modifier = Modifier.fillMaxSize(),
         )
     }

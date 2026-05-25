@@ -3,28 +3,29 @@ package com.eazpire.creator.wear.ui
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.wear.compose.material.Button
 import androidx.wear.compose.material.CircularProgressIndicator
 import androidx.wear.compose.material.MaterialTheme
 import androidx.wear.compose.material.Text
-import coil.compose.AsyncImage
+import coil.compose.SubcomposeAsyncImage
 import com.eazpire.creator.core.api.CreatorPhoneUploadApi
 import com.eazpire.creator.core.i18n.WearTranslationStore
+import com.eazpire.creator.wear.EazColors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -143,6 +144,7 @@ class WearPhoneUploadController(
 fun WearPhoneUploadOverlay(
     controller: WearPhoneUploadController,
     translationStore: WearTranslationStore,
+    economy: WearEconomySnapshot,
     modifier: Modifier = Modifier,
 ) {
     DisposableEffect(controller) {
@@ -157,61 +159,90 @@ fun WearPhoneUploadOverlay(
             }
         }
         is WearPhoneUploadState.Qr -> {
-            Column(
-                modifier = modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 6.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center,
-            ) {
-                Text(
-                    text = translationStore.t("wear.upload_scan", "Scan with your phone"),
-                    style = MaterialTheme.typography.caption2,
-                    textAlign = TextAlign.Center,
-                )
-                val model = controller.qrModelUrl ?: overlay.primaryQrUrl
-                AsyncImage(
-                    model = model,
-                    contentDescription = "Upload QR",
+            Box(modifier = modifier.fillMaxSize()) {
+                WearBackChevronButton(
+                    onClick = { controller.close() },
+                    contentDescription = translationStore.t("wear.back", "Back"),
                     modifier = Modifier
-                        .padding(vertical = 6.dp)
-                        .size(120.dp),
-                    contentScale = ContentScale.Fit,
-                    onError = {
-                        if (controller.qrModelUrl != overlay.fallbackQrUrl) {
-                            controller.setQrFallback(overlay.fallbackQrUrl)
-                        }
-                    },
+                        .align(Alignment.CenterStart)
+                        .padding(start = 2.dp),
                 )
-                Button(onClick = { controller.close() }) {
-                    Text(translationStore.t("wear.back", "Back"))
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center,
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        Text(
+                            text = translationStore.t("wear.upload_scan", "Scan with your phone"),
+                            style = MaterialTheme.typography.caption2,
+                            textAlign = TextAlign.Center,
+                        )
+                        val model = controller.qrModelUrl ?: overlay.primaryQrUrl
+                        SubcomposeAsyncImage(
+                            model = model,
+                            contentDescription = "Upload QR",
+                            modifier = Modifier
+                                .padding(vertical = 6.dp)
+                                .size(108.dp),
+                            contentScale = ContentScale.Fit,
+                            loading = {
+                                Box(Modifier.size(108.dp), contentAlignment = Alignment.Center) {
+                                    CircularProgressIndicator()
+                                }
+                            },
+                            error = {
+                                if (controller.qrModelUrl != overlay.fallbackQrUrl) {
+                                    controller.setQrFallback(overlay.fallbackQrUrl)
+                                }
+                            },
+                        )
+                    }
+                    WearEconomyFooterLine(
+                        snapshot = economy,
+                        translationStore = translationStore,
+                        mode = WearEconomyFooterMode.Upload,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 6.dp),
+                    )
                 }
             }
         }
         is WearPhoneUploadState.Error -> {
-            Column(
-                modifier = modifier
-                    .fillMaxSize()
-                    .padding(12.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center,
-            ) {
-                Text(
-                    text = translationStore.t("wear.upload_error", "Upload not available"),
-                    style = MaterialTheme.typography.caption2,
-                    textAlign = TextAlign.Center,
-                )
-                Text(
-                    text = overlay.message,
-                    style = MaterialTheme.typography.caption2,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(top = 4.dp),
-                )
-                Button(
+            Box(modifier = modifier.fillMaxSize()) {
+                WearBackChevronButton(
                     onClick = { controller.close() },
-                    modifier = Modifier.padding(top = 8.dp),
+                    contentDescription = translationStore.t("wear.back", "Back"),
+                    modifier = Modifier
+                        .align(Alignment.CenterStart)
+                        .padding(start = 2.dp),
+                )
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
                 ) {
-                    Text(translationStore.t("wear.back", "Back"))
+                    Text(
+                        text = translationStore.t("wear.upload_error", "Upload not available"),
+                        style = MaterialTheme.typography.caption2,
+                        textAlign = TextAlign.Center,
+                    )
+                    Text(
+                        text = overlay.message,
+                        style = MaterialTheme.typography.caption2,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
                 }
             }
         }

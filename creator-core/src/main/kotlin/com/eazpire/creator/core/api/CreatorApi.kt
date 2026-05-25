@@ -96,9 +96,13 @@ class CreatorApi(
     suspend fun getPublishedProducts(
         ownerId: String,
         shop: String? = com.eazpire.creator.core.auth.AuthConfig.SHOP_DOMAIN,
+        limit: Int? = null,
+        wearFast: Boolean = false,
     ): JSONObject {
         val params = mutableMapOf("owner_id" to ownerId)
         shop?.takeIf { it.isNotBlank() }?.let { params["shop"] = it }
+        limit?.takeIf { it > 0 }?.let { params["limit"] = it.toString() }
+        if (wearFast) params["wear_fast"] = "1"
         return call("get-published-products", params)
     }
 

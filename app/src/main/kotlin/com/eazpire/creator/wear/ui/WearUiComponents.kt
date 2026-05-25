@@ -67,11 +67,35 @@ fun WearRoundIconButton(
 }
 
 @Composable
+fun WearBackChevronButton(
+    onClick: () -> Unit,
+    contentDescription: String,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier = modifier
+            .size(36.dp)
+            .clip(CircleShape)
+            .background(EazColors.CreatorSurface.copy(alpha = 0.92f))
+            .border(1.dp, EazColors.Orange.copy(alpha = 0.65f), CircleShape)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = "‹",
+            fontSize = 22.sp,
+            color = EazColors.Orange,
+        )
+    }
+}
+
+@Composable
 fun WearPulsingGenerateButton(
     onClick: () -> Unit,
     enabled: Boolean,
     label: String,
     modifier: Modifier = Modifier,
+    economy: WearEconomySnapshot? = null,
 ) {
     val pulse = rememberInfiniteTransition(label = "genPulse")
     val scale by pulse.animateFloat(
@@ -104,12 +128,48 @@ fun WearPulsingGenerateButton(
             .padding(vertical = 12.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.button,
-            color = EazColors.TextPrimary,
-            textAlign = TextAlign.Center,
-        )
+        val showEazCost = economy?.walletActive == true && economy.isGenerateFree != true
+        Row(
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (showEazCost) {
+                WearEazCoinIcon(modifier = Modifier.size(16.dp))
+                Spacer(modifier = Modifier.size(4.dp))
+            }
+            Text(
+                text = label,
+                style = MaterialTheme.typography.button,
+                color = EazColors.TextPrimary,
+                textAlign = TextAlign.Center,
+            )
+            if (showEazCost) {
+                Spacer(modifier = Modifier.size(4.dp))
+                Text(
+                    text = formatWearEazAmount(economy.eazGenerateCost),
+                    style = MaterialTheme.typography.button,
+                    color = EazColors.TextPrimary,
+                    fontSize = 12.sp,
+                )
+            } else if (economy?.walletActive == true && economy.isGenerateFree) {
+                Spacer(modifier = Modifier.size(4.dp))
+                Text(
+                    text = "Free",
+                    style = MaterialTheme.typography.caption2,
+                    color = EazColors.TextPrimary,
+                    fontSize = 11.sp,
+                )
+            }
+        }
+    }
+}
+
+internal fun formatWearEazAmount(value: Double): String {
+    val rounded = kotlin.math.round(value * 10.0) / 10.0
+    return if (rounded == rounded.toLong().toDouble()) {
+        rounded.toLong().toString()
+    } else {
+        String.format(java.util.Locale.US, "%.1f", rounded)
     }
 }
 

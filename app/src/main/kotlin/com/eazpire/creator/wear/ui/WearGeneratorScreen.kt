@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
@@ -57,6 +58,7 @@ fun WearGeneratorScreen(
         WearPhoneUploadController(uploadApi, translationStore)
     }
     val scope = rememberCoroutineScope()
+    val economy = rememberWearEconomySnapshot(api, ownerId, refreshKey)
 
     var prompt by remember { mutableStateOf("") }
     var uploadImageUrl by remember { mutableStateOf<String?>(null) }
@@ -155,67 +157,92 @@ fun WearGeneratorScreen(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                    .padding(horizontal = 8.dp, vertical = 2.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center,
+                verticalArrangement = Arrangement.SpaceBetween,
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceEvenly,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    val imageUrl = uploadImageUrl
-                    if (!imageUrl.isNullOrBlank()) {
-                        WearImagePreviewSlot(
-                            imageUrl = imageUrl,
-                            onClick = { inputActionTarget = InputActionTarget.Image },
-                            modifier = Modifier.size(52.dp),
-                        )
-                    } else {
-                        WearRoundIconButton(
-                            onClick = { startUploadQr() },
-                            contentDescription = translationStore.t("wear.upload", "Phone upload"),
-                        ) {
-                            Text("📱", fontSize = 22.sp)
-                        }
-                    }
-
-                    if (prompt.isNotBlank()) {
-                        WearTextPreviewSlot(
-                            text = prompt.take(48),
-                            onClick = { inputActionTarget = InputActionTarget.Prompt },
-                            modifier = Modifier.size(52.dp),
-                        )
-                    } else {
-                        WearRoundIconButton(
-                            onClick = { launchVoice() },
-                            contentDescription = translationStore.t("wear.audio", "Audio"),
-                        ) {
-                            Text("🎤", fontSize = 22.sp)
-                        }
-                    }
-                }
-
-                WearPulsingGenerateButton(
-                    onClick = { openGenerateConfirm() },
-                    enabled = !generating,
-                    label = translationStore.t("wear.generate", "Generate"),
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = 12.dp, start = 12.dp, end = 12.dp),
-                )
+                        .weight(1f),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceEvenly,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        val imageUrl = uploadImageUrl
+                        if (!imageUrl.isNullOrBlank()) {
+                            WearImagePreviewSlot(
+                                imageUrl = imageUrl,
+                                onClick = { inputActionTarget = InputActionTarget.Image },
+                                modifier = Modifier.size(52.dp),
+                            )
+                        } else {
+                            WearRoundIconButton(
+                                onClick = { startUploadQr() },
+                                contentDescription = translationStore.t("wear.upload", "Phone upload"),
+                            ) {
+                                Text("📱", fontSize = 22.sp)
+                            }
+                        }
 
-                if (generating) {
-                    CircularProgressIndicator(modifier = Modifier.padding(top = 8.dp))
+                        if (prompt.isNotBlank()) {
+                            WearTextPreviewSlot(
+                                text = prompt.take(48),
+                                onClick = { inputActionTarget = InputActionTarget.Prompt },
+                                modifier = Modifier.size(52.dp),
+                            )
+                        } else {
+                            WearRoundIconButton(
+                                onClick = { launchVoice() },
+                                contentDescription = translationStore.t("wear.audio", "Audio"),
+                            ) {
+                                Text("🎤", fontSize = 22.sp)
+                            }
+                        }
+                    }
                 }
-                status?.let { msg ->
-                    Text(
-                        text = msg,
-                        style = MaterialTheme.typography.caption2,
-                        color = EazColors.Orange,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.padding(top = 4.dp),
+
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    WearPulsingGenerateButton(
+                        onClick = { openGenerateConfirm() },
+                        enabled = !generating,
+                        label = translationStore.t("wear.generate", "Generate"),
+                        economy = economy,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 10.dp),
                     )
+
+                    WearEconomyFooterLine(
+                        snapshot = economy,
+                        translationStore = translationStore,
+                        mode = WearEconomyFooterMode.Generate,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 6.dp, bottom = 4.dp),
+                    )
+
+                    if (generating) {
+                        CircularProgressIndicator(modifier = Modifier.padding(top = 4.dp))
+                    }
+                    status?.let { msg ->
+                        Text(
+                            text = msg,
+                            style = MaterialTheme.typography.caption2,
+                            color = EazColors.Orange,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.padding(top = 2.dp),
+                        )
+                    }
                 }
             }
         }
@@ -223,6 +250,7 @@ fun WearGeneratorScreen(
         WearPhoneUploadOverlay(
             controller = uploadController,
             translationStore = translationStore,
+            economy = economy,
             modifier = Modifier.fillMaxSize(),
         )
 

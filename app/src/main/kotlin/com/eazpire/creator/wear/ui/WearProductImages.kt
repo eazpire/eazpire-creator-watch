@@ -88,7 +88,7 @@ internal suspend fun loadWearProductCatalog(
     api: CreatorApi,
     ownerId: String,
 ): List<WearCarouselItem> = withContext(Dispatchers.IO) {
-    val res = api.getPublishedProducts(ownerId)
+    val res = api.getPublishedProducts(ownerId, limit = 80, wearFast = true)
     if (!res.optBoolean("ok", false)) return@withContext emptyList()
     val arr: JSONArray = res.optJSONArray("products") ?: JSONArray()
     buildList {
