@@ -14,7 +14,6 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.wear.compose.material.Chip
 import androidx.wear.compose.material.ChipDefaults
@@ -24,13 +23,10 @@ import com.eazpire.creator.core.auth.SecureTokenStore
 import com.eazpire.creator.core.i18n.WearTranslationStore
 import com.eazpire.creator.wear.EazColors
 
-private enum class WearMainTab { Dashboard, Jobs, Upload }
-
 @Composable
 fun WearMainShell(
     tokenStore: SecureTokenStore,
     translationStore: WearTranslationStore,
-    demoPreview: Boolean,
     refreshKey: Int,
     modifier: Modifier = Modifier,
 ) {
@@ -46,18 +42,6 @@ fun WearMainShell(
             .fillMaxSize()
             .padding(top = 12.dp, start = 10.dp, end = 10.dp, bottom = 8.dp),
     ) {
-        if (demoPreview) {
-            Text(
-                text = translationStore.t("wear.demo_short", "Demo data"),
-                style = MaterialTheme.typography.caption2,
-                color = EazColors.Orange,
-                textAlign = TextAlign.Center,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 4.dp),
-            )
-        }
-
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -95,7 +79,7 @@ fun WearMainShell(
                     tokenStore = tokenStore,
                     translationStore = translationStore,
                     refreshKey = refreshKey,
-                    useDemoData = demoPreview,
+                    useDemoData = false,
                     showTitle = false,
                     modifier = Modifier.fillMaxSize(),
                 )
@@ -103,7 +87,7 @@ fun WearMainShell(
                     tokenStore = tokenStore,
                     translationStore = translationStore,
                     refreshKey = refreshKey,
-                    useDemoData = demoPreview,
+                    useDemoData = false,
                     showTitle = false,
                     modifier = Modifier.fillMaxSize(),
                 )
@@ -111,7 +95,7 @@ fun WearMainShell(
                     tokenStore = tokenStore,
                     translationStore = translationStore,
                     refreshKey = refreshKey,
-                    useDemoData = demoPreview,
+                    useDemoData = false,
                     showTitle = false,
                     modifier = Modifier.fillMaxSize(),
                 )
