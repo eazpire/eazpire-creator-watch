@@ -7,6 +7,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -35,10 +36,11 @@ fun WearProductsScreen(
     var mockupCache by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
     var searchDraft by remember { mutableStateOf("") }
     var appliedSearch by remember { mutableStateOf("") }
+    var carouselIndex by remember { mutableIntStateOf(0) }
     val fetchingKeys = remember { mutableStateOf(setOf<String>()) }
 
     val displayItems = remember(catalog, mockupCache) {
-        catalog.map { it.withMockupCache(mockupCache) }
+        catalog.map { it.withResolvedImage(mockupCache) }
     }
 
     val speechLauncher = rememberLauncherForActivityResult(
@@ -65,20 +67,29 @@ fun WearProductsScreen(
         } catch (_: Exception) { /* ignore */ }
     }
 
-    fun prefetchMockupsAround(index: Int, items: List<WearCarouselItem>) {
-        if (ownerId.isBlank() || items.isEmpty()) return
+    fun filteredItems(items: List<WearCarouselItem>): List<WearCarouselItem> {
         val q = appliedSearch.trim()
-        val filtered = if (q.isBlank()) items else items.filter {
+        if (q.isBlank()) return items
+        return items.filter {
             it.label?.contains(q, ignoreCase = true) == true ||
                 it.productKey?.contains(q, ignoreCase = true) == true
         }
+    }
+
+    fun prefetchMockupsAround(index: Int, items: List<WearCarouselItem>) {
+        if (ownerId.isBlank()) return
+        val filtered = filteredItems(items)
         if (filtered.isEmpty()) return
         val safe = index.coerceIn(0, filtered.lastIndex)
         val keys = filtered.drop(safe).take(WEAR_PRODUCT_MOCKUP_PREFETCH)
             .mapNotNull { it.productKey }
             .filter { pk ->
+                !fetchingKeys.value.contains(pk) &&
+                    (!mockupCache.containsKey(pk) || !isWearLoadableImageUrl(mockupCache[pk]))
+            }
+            .filter { pk ->
                 val row = filtered.find { it.productKey == pk }
-                row?.imageUrl.isNullOrBlank() && !mockupCache.containsKey(pk) && !fetchingKeys.value.contains(pk)
+                row != null && !isWearLoadableImageUrl(row.resolvedProductImage(mockupCache))
             }
         if (keys.isEmpty()) return
         fetchingKeys.value = fetchingKeys.value + keys
@@ -108,14 +119,24 @@ fun WearProductsScreen(
             catalog = withContext(Dispatchers.IO) { loadWearProductCatalog(api, ownerId) }
             mockupCache = emptyMap()
             fetchingKeys.value = emptySet()
+            carouselIndex = 0
+            val initialKeys = catalog.mapNotNull { it.productKey }.take(WEAR_PRODUCT_MOCKUP_PREFETCH)
+            if (initialKeys.isNotEmpty()) {
+                val loaded = withContext(Dispatchers.IO) {
+                    fetchWearProductMockups(api, ownerId, initialKeys)
+                }
+                mockupCache = loaded
+            }
         } catch (_: Exception) {
             catalog = emptyList()
         }
         loading = false
     }
 
-    LaunchedEffect(catalog.size, appliedSearch) {
-        if (catalog.isNotEmpty()) prefetchMockupsAround(0, displayItems)
+    LaunchedEffect(carouselIndex, appliedSearch, catalog.size) {
+        if (!loading && catalog.isNotEmpty()) {
+            prefetchMockupsAround(carouselIndex, displayItems)
+        }
     }
 
     WearCarouselScreen(
@@ -129,7 +150,12 @@ fun WearProductsScreen(
         onVoiceSearch = { launchVoice() },
         searchPlaceholder = translationStore.t("wear.search_short", "Search…"),
         showSearch = true,
-        onPageIndexChanged = { index, _ -> prefetchMockupsAround(index, displayItems) },
+        productImageMode = true,
+        initialCarouselIndex = carouselIndex,
+        onPageIndexChanged = { index, _ ->
+            carouselIndex = index
+            prefetchMockupsAround(index, displayItems)
+        },
         modifier = modifier,
     )
 }

@@ -108,6 +108,18 @@ class CreatorApi(
             mapOf("owner_id" to ownerId, "product_keys" to productKeys),
         )
 
+    suspend fun getProductsByKeysPost(ownerId: String, productKeys: List<String>): JSONObject {
+        val arr = org.json.JSONArray()
+        productKeys.forEach { k -> if (k.isNotBlank()) arr.put(k) }
+        val body = org.json.JSONObject().put("product_keys", arr)
+        return call(
+            "get-products-by-keys",
+            mapOf("owner_id" to ownerId),
+            method = "POST",
+            jsonBody = body.toString(),
+        )
+    }
+
     suspend fun getSettings(ownerId: String): JSONObject =
         call("get-settings", mapOf("owner_id" to ownerId))
 

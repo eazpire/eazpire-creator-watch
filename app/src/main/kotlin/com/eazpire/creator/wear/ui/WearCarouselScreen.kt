@@ -61,10 +61,11 @@ fun WearCarouselScreen(
     onUploadClick: (() -> Unit)? = null,
     onItemClick: ((WearCarouselItem) -> Unit)? = null,
     onPageIndexChanged: ((Int, WearCarouselItem?) -> Unit)? = null,
+    productImageMode: Boolean = false,
     initialCarouselIndex: Int = 0,
     modifier: Modifier = Modifier,
 ) {
-    var index by remember(items, filterQuery, initialCarouselIndex) {
+    var index by remember(filterQuery, initialCarouselIndex) {
         mutableIntStateOf(initialCarouselIndex.coerceAtLeast(0))
     }
     val filtered = remember(items, filterQuery) {
@@ -191,23 +192,31 @@ fun WearCarouselScreen(
                         },
                     contentAlignment = Alignment.Center,
                 ) {
-                    val url = current?.imageUrl
-                    if (!url.isNullOrBlank()) {
-                        AsyncImage(
-                            model = url,
-                            contentDescription = current.label,
-                            modifier = Modifier
-                                .fillMaxWidth(0.92f)
-                                .fillMaxHeight(0.98f),
-                            contentScale = ContentScale.Fit,
+                    if (productImageMode && current != null) {
+                        WearCarouselProductImage(
+                            imageUrl = current.imageUrl,
+                            label = current.label,
+                            modifier = Modifier.fillMaxWidth(0.92f).fillMaxHeight(0.98f),
                         )
                     } else {
-                        Text(
-                            text = current?.label ?: "—",
-                            style = MaterialTheme.typography.body2,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.padding(horizontal = 12.dp),
-                        )
+                        val url = current?.imageUrl
+                        if (!url.isNullOrBlank()) {
+                            AsyncImage(
+                                model = url,
+                                contentDescription = current.label,
+                                modifier = Modifier
+                                    .fillMaxWidth(0.92f)
+                                    .fillMaxHeight(0.98f),
+                                contentScale = ContentScale.Fit,
+                            )
+                        } else {
+                            Text(
+                                text = current?.label ?: "—",
+                                style = MaterialTheme.typography.body2,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.padding(horizontal = 12.dp),
+                            )
+                        }
                     }
                     if (current?.isProcessing == true) {
                         CircularProgressIndicator(
