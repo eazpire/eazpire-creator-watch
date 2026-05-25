@@ -108,6 +108,41 @@ class CreatorApi(
             mapOf("owner_id" to ownerId, "product_keys" to productKeys),
         )
 
+    suspend fun getSettings(ownerId: String): JSONObject =
+        call("get-settings", mapOf("owner_id" to ownerId))
+
+    suspend fun getPublishedSummary(ownerId: String): JSONObject =
+        call("get-published-summary", mapOf("owner_id" to ownerId))
+
+    suspend fun getDesignPublishedRows(ownerId: String, designId: String): JSONObject =
+        call(
+            "get-design-published-rows",
+            mapOf("owner_id" to ownerId, "design_id" to designId),
+        )
+
+    suspend fun updateDesign(ownerId: String, body: JSONObject): JSONObject =
+        call("update-design", mapOf("owner_id" to ownerId), method = "PUT", jsonBody = body.toString())
+
+    suspend fun deleteDesign(ownerId: String, designId: String): JSONObject =
+        call(
+            "delete-design",
+            mapOf("owner_id" to ownerId, "design_id" to designId),
+            method = "DELETE",
+        )
+
+    suspend fun batchUnpublishPublished(ownerId: String, publishedIds: List<Int>): JSONObject {
+        val body = JSONObject().put(
+            "published_design_ids",
+            org.json.JSONArray(publishedIds),
+        )
+        return call(
+            "batch-unpublish-published",
+            mapOf("owner_id" to ownerId),
+            method = "POST",
+            jsonBody = body.toString(),
+        )
+    }
+
     suspend fun wearGenerate(ownerId: String, prompt: String? = null, imageUrl: String? = null): JSONObject {
         val body = JSONObject().put("owner_id", ownerId)
         if (!prompt.isNullOrBlank()) body.put("prompt", prompt)

@@ -66,6 +66,15 @@ class WearTranslationStore(private var lang: String = "en") {
             "wear.gen_confirm_prompt" to "Do you want to generate?",
             "wear.err_insufficient_eaz" to "Not enough EAZ. Top up on eazpire.com.",
             "wear.upload_processing" to "Uploading…",
+            "wear.design" to "Design",
+            "wear.design_activate" to "Activate",
+            "wear.design_deactivate" to "Deactivate",
+            "wear.design_delete_confirm" to "Delete this design?",
+            "wear.design_delete_products_warn" to "Deleting will remove {{count}} products.",
+            "wear.design_deactivate_confirm" to "Deactivate this design?",
+            "wear.design_activate_creator_confirm" to "Activate as {{creator}}?",
+            "wear.design_pick_creator" to "Choose creator",
+            "wear.design_no_creator" to "No creator name configured.",
         )
     }
 }

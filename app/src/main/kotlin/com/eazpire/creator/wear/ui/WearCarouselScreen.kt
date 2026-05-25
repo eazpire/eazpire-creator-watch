@@ -1,8 +1,8 @@
 package com.eazpire.creator.wear.ui
 
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -35,6 +35,8 @@ data class WearCarouselItem(
     val imageUrl: String?,
     val label: String? = null,
     val jobId: String? = null,
+    val designId: String? = null,
+    val libraryStatus: String? = null,
 )
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -162,6 +164,13 @@ fun WearCarouselScreen(
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxWidth()
+                        .then(
+                            if (onItemClick != null && current != null) {
+                                Modifier.clickable { onItemClick(current) }
+                            } else {
+                                Modifier
+                            },
+                        )
                         .pointerInput(total, safeIndex) {
                             detectHorizontalDragGestures { _, drag ->
                                 if (abs(drag) < 28f) return@detectHorizontalDragGestures

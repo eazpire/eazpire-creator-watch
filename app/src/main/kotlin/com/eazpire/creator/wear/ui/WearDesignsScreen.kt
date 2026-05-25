@@ -50,6 +50,8 @@ fun WearDesignsScreen(
     var carouselIndex by remember { mutableIntStateOf(0) }
     var highlightJobId by remember { mutableStateOf<String?>(null) }
     var uploading by remember { mutableStateOf(false) }
+    var selectedDesign by remember { mutableStateOf<WearCarouselItem?>(null) }
+    var publishedCountByDesignId by remember { mutableStateOf<Map<String, Int>>(emptyMap()) }
 
     val speechLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult(),
@@ -83,11 +85,17 @@ fun WearDesignsScreen(
                     .ifBlank { o.optJSONObject("result")?.optString("image_url").orEmpty() }
                 val title = o.optString("title", o.optString("name", "")).trim()
                 if (preview.isBlank() && title.isBlank()) continue
+                val designId = o.optString("id", "")
+                    .ifBlank { o.optString("design_id", "") }
+                    .trim()
+                    .takeIf { it.isNotBlank() }
                 add(
                     WearCarouselItem(
                         imageUrl = preview.takeIf { it.isNotBlank() },
                         label = title.takeIf { it.isNotBlank() },
                         jobId = o.optString("job_id", "").takeIf { it.isNotBlank() },
+                        designId = designId,
+                        libraryStatus = "active",
                     ),
                 )
             }
@@ -106,15 +114,36 @@ fun WearDesignsScreen(
                 val title = o.optString("title", o.optString("name", "")).trim()
                     .ifBlank { o.optString("prompt", "").take(32) }
                 if (preview.isBlank() && title.isBlank()) continue
+                val designId = o.optString("design_id", "")
+                    .ifBlank { o.optString("id", "") }
+                    .trim()
+                    .takeIf { it.isNotBlank() }
                 add(
                     WearCarouselItem(
                         imageUrl = preview.takeIf { it.isNotBlank() },
                         label = title.takeIf { it.isNotBlank() },
                         jobId = o.optString("job_id", "").takeIf { it.isNotBlank() },
+                        designId = designId,
+                        libraryStatus = "inactive",
                     ),
                 )
             }
         }
+    }
+
+    suspend fun loadPublishedSummaryMap(): Map<String, Int> {
+        if (ownerId.isBlank()) return emptyMap()
+        val res = api.getPublishedSummary(ownerId)
+        if (!res.optBoolean("ok", false)) return emptyMap()
+        val arr = res.optJSONArray("designs") ?: JSONArray()
+        val map = mutableMapOf<String, Int>()
+        for (i in 0 until arr.length()) {
+            val row = arr.optJSONObject(i) ?: continue
+            val id = row.optString("design_id", "").trim()
+            if (id.isBlank()) continue
+            map[id] = row.optInt("products_count", 0)
+        }
+        return map
     }
 
     suspend fun loadDesignItems(): List<WearCarouselItem> {
@@ -141,6 +170,7 @@ fun WearDesignsScreen(
                     imageUrl = preview,
                     label = translationStore.t("wear.upload_processing", "Uploading…"),
                     jobId = hid,
+                    libraryStatus = "inactive",
                 ),
             ) + base
         }
@@ -156,6 +186,9 @@ fun WearDesignsScreen(
         loading = true
         try {
             items = withContext(Dispatchers.IO) { loadDesignItems() }
+            if (activityFilter == "active") {
+                publishedCountByDesignId = withContext(Dispatchers.IO) { loadPublishedSummaryMap() }
+            }
             carouselIndex = 0
         } catch (_: Exception) {
             items = emptyList()
@@ -238,6 +271,24 @@ fun WearDesignsScreen(
             activeLabel = translationStore.t("wear.designs_active", "Active"),
             inactiveLabel = translationStore.t("wear.designs_inactive", "Inactive"),
             initialCarouselIndex = carouselIndex,
+            onItemClick = { item ->
+                if (!item.designId.isNullOrBlank()) selectedDesign = item
+            },
+            modifier = Modifier.fillMaxSize(),
+        )
+
+        WearDesignLibraryActionsHost(
+            item = selectedDesign,
+            activityFilter = activityFilter,
+            publishedCountByDesignId = publishedCountByDesignId,
+            api = api,
+            ownerId = ownerId,
+            translationStore = translationStore,
+            onDismiss = { selectedDesign = null },
+            onCompleted = {
+                selectedDesign = null
+                loadNonce++
+            },
             modifier = Modifier.fillMaxSize(),
         )
 

@@ -47,23 +47,22 @@ internal suspend fun loadWearProductCarouselItems(
             add(Triple(key, name, img))
         }
     }
-    val needMockupKeys = rows.filter { it.third.isNullOrBlank() && it.first.isNotBlank() }.map { it.first }
-    val mockupByKey = if (needMockupKeys.isEmpty()) {
-        emptyMap()
-    } else {
-        val keysParam = needMockupKeys.distinct().joinToString(",")
-        val mockRes = api.getProductsByKeys(ownerId, keysParam)
-        val map = mutableMapOf<String, String>()
-        if (mockRes.optBoolean("ok", false)) {
+    val needMockupKeys = rows.filter { it.third.isNullOrBlank() && it.first.isNotBlank() }.map { it.first }.distinct()
+    val mockupByKey = mutableMapOf<String, String>()
+    if (needMockupKeys.isNotEmpty()) {
+        // Batched requests — one giant product_keys query exceeds URL limits (593+ products).
+        val batchSize = 40
+        for (chunk in needMockupKeys.chunked(batchSize)) {
+            val mockRes = api.getProductsByKeys(ownerId, chunk.joinToString(","))
+            if (!mockRes.optBoolean("ok", false)) continue
             val mockArr = mockRes.optJSONArray("products") ?: JSONArray()
             for (i in 0 until mockArr.length()) {
                 val m = mockArr.optJSONObject(i) ?: continue
                 val pk = m.optString("product_key", "").trim()
                 val url = normalizeWearImageUrl(m.optString("image_url", ""))
-                if (pk.isNotBlank() && !url.isNullOrBlank()) map[pk] = url
+                if (pk.isNotBlank() && !url.isNullOrBlank()) mockupByKey[pk] = url
             }
         }
-        map
     }
     rows.map { (key, name, img) ->
         val url = img ?: mockupByKey[key]

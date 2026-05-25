@@ -57,6 +57,27 @@ internal fun wearJobKindLabel(type: String, action: String): String {
     }
 }
 
+internal fun wearJobDisplayTitle(o: org.json.JSONObject): String {
+    fun clean(s: String): String {
+        val t = s.trim()
+        return if (t.isBlank() || t.equals("null", ignoreCase = true)) "" else t
+    }
+    val prompt = clean(o.optString("prompt", ""))
+    val finalP = clean(o.optString("final_prompt", ""))
+    val designPrompt = clean(o.optString("design_prompt", ""))
+    val message = clean(o.optString("message", ""))
+    val candidates = listOf(prompt, finalP, designPrompt, message).filter { it.isNotBlank() }
+    if (candidates.isNotEmpty()) return candidates.first().take(40)
+    val type = o.optString("type", o.optString("action", ""))
+    return wearJobKindLabel(type, o.optString("action", ""))
+}
+
+internal fun wearJobDeviceLabel(o: org.json.JSONObject): String? {
+    val device = o.optString("client_device", "").trim()
+        .ifBlank { o.optString("source", "").trim() }
+    return device.takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
+}
+
 internal fun wearJobStatusLine(
     done: Boolean,
     saving: Boolean,
@@ -105,11 +126,8 @@ fun WearJobsScreen(
                     val progress = o.optInt("progress", -1).coerceIn(-1, 100)
                     val saving = o.optBoolean("saving", false)
                     val type = o.optString("type", o.optString("action", ""))
-                    val prompt = o.optString("prompt", o.optString("final_prompt", "")).take(40)
-                    val title = if (prompt.isNotBlank()) prompt else wearJobKindLabel(type, o.optString("action", ""))
-                    val device = o.optString("client_device", "").trim()
-                        .ifBlank { o.optString("source", "").trim() }
-                        .takeIf { it.isNotBlank() }
+                    val title = wearJobDisplayTitle(o)
+                    val device = wearJobDeviceLabel(o)
                     val preview = o.optString("preview_url", "")
                         .ifBlank { o.optJSONObject("result")?.optString("preview_url").orEmpty() }
                         .ifBlank { o.optString("image_url", "") }
