@@ -38,8 +38,12 @@ import com.eazpire.creator.wear.auth.bootstrapAuthFromPhone
 import com.eazpire.creator.wear.ui.WearDashboardScreen
 import com.eazpire.creator.wear.ui.WearJobsScreen
 import com.eazpire.creator.wear.ui.WearPairingScreen
+import com.eazpire.creator.wear.ui.WearSplashScreen
 import com.eazpire.creator.wear.ui.WearUploadScreen
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+
+private const val SPLASH_MIN_MS = 1400L
 
 private enum class WearTab { Dashboard, Jobs, Upload }
 
@@ -48,6 +52,7 @@ fun WearApp(tokenStore: SecureTokenStore) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val translationStore = remember { WearTranslationStore() }
+    var showSplash by remember { mutableStateOf(true) }
     var bootstrapped by remember { mutableStateOf(false) }
     var loggedIn by remember { mutableStateOf(tokenStore.isLoggedIn()) }
     var demoPreview by remember { mutableStateOf(false) }
@@ -80,7 +85,11 @@ fun WearApp(tokenStore: SecureTokenStore) {
     }
 
     LaunchedEffect(Unit) {
+        val started = System.currentTimeMillis()
         applyBootstrapResult()
+        val remaining = SPLASH_MIN_MS - (System.currentTimeMillis() - started)
+        if (remaining > 0) delay(remaining)
+        showSplash = false
     }
 
     DisposableEffect(context) {
@@ -103,10 +112,11 @@ fun WearApp(tokenStore: SecureTokenStore) {
         modifier = Modifier
             .fillMaxSize()
             .background(EazColors.CreatorBg),
-        timeText = { if (bootstrapped) TimeText() },
-        vignette = { Vignette(vignettePosition = VignettePosition.TopAndBottom) },
+        timeText = { if (!showSplash) TimeText() },
+        vignette = { if (!showSplash) Vignette(vignettePosition = VignettePosition.TopAndBottom) },
     ) {
         when {
+            showSplash -> WearSplashScreen(modifier = Modifier.fillMaxSize())
             !bootstrapped -> WearLoadingPane(translationStore)
             !loggedIn && !demoPreview -> WearPairingScreen(
                 translationStore = translationStore,
