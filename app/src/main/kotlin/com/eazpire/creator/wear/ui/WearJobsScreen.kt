@@ -1,10 +1,10 @@
 package com.eazpire.creator.wear.ui
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -13,7 +13,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.wear.compose.material.MaterialTheme
@@ -21,7 +20,6 @@ import androidx.wear.compose.material.Text
 import androidx.wear.compose.foundation.lazy.AutoCenteringParams
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
-import coil.compose.AsyncImage
 import com.eazpire.creator.core.api.CreatorApi
 import com.eazpire.creator.core.auth.SecureTokenStore
 import com.eazpire.creator.core.i18n.WearTranslationStore
@@ -39,8 +37,11 @@ data class WearJobRow(
     val device: String?,
     val statusLine: String,
     val progress: Int,
+    val message: String,
     val previewUrl: String?,
     val done: Boolean,
+    val saving: Boolean,
+    val saved: Boolean,
 )
 
 internal fun wearJobKindLabel(type: String, action: String): String {
@@ -76,6 +77,16 @@ internal fun wearJobDeviceLabel(o: org.json.JSONObject): String? {
     val device = o.optString("client_device", "").trim()
         .ifBlank { o.optString("source", "").trim() }
     return device.takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
+}
+
+/** UI progress: save phase must not drop to 0 after generate (KV used to reset progress). */
+internal fun wearJobUiProgress(progress: Int, saving: Boolean, done: Boolean): Int {
+    val p = progress.coerceIn(0, 100)
+    return when {
+        saving -> maxOf(p, 90).coerceIn(0, 99)
+        done && p < 100 -> maxOf(p, 90)
+        else -> p
+    }
 }
 
 internal fun wearJobStatusLine(
@@ -121,10 +132,12 @@ fun WearJobsScreen(
                 for (i in 0 until arr.length()) {
                     val o = arr.optJSONObject(i) ?: continue
                     val done = o.optBoolean("done", false)
-                    if (activeOnly && done) continue
+                    val saving = o.optBoolean("saving", false)
+                    val saved = o.optBoolean("saved", false)
+                    // Keep jobs while generating or saving (web shows this too; done alone hides too early).
+                    if (activeOnly && done && !saving && saved) continue
                     val message = o.optString("message", "").trim()
                     val progress = o.optInt("progress", -1).coerceIn(-1, 100)
-                    val saving = o.optBoolean("saving", false)
                     val type = o.optString("type", o.optString("action", ""))
                     val title = wearJobDisplayTitle(o)
                     val device = wearJobDeviceLabel(o)
@@ -139,8 +152,11 @@ fun WearJobsScreen(
                             device = device,
                             statusLine = wearJobStatusLine(done, saving, message, progress),
                             progress = if (progress >= 0) progress else 0,
+                            message = message,
                             previewUrl = preview.takeIf { it.isNotBlank() },
                             done = done,
+                            saving = saving,
+                            saved = saved,
                         ),
                     )
                 }
@@ -188,9 +204,17 @@ fun WearJobsScreen(
         }
         if (loading && jobs.isEmpty()) {
             item {
-                WearTetrisAssemblyLoader(
-                    modifier = Modifier.padding(vertical = 8.dp),
-                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    WearActiveJobCard(
+                        title = "…",
+                        progress = 0,
+                    )
+                }
             }
         } else if (jobs.isEmpty()) {
             item {
@@ -204,38 +228,24 @@ fun WearJobsScreen(
         } else {
             items(jobs.size) { i ->
                 val job = jobs[i]
-                Row(
+                val statusHint = when {
+                    job.done && job.saving -> job.message.ifBlank { "Saving…" }
+                    else -> job.message.ifBlank { "Processing…" }
+                }
+                val isError = job.done && !job.saving && !job.saved &&
+                    (statusHint.contains("Fehler", ignoreCase = true) ||
+                        statusHint.contains("error", ignoreCase = true))
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        .padding(vertical = 6.dp),
+                    contentAlignment = Alignment.Center,
                 ) {
-                    if (!job.done) {
-                        WearTetrisAssemblyLoader(modifier = Modifier.size(44.dp))
-                    } else if (!job.previewUrl.isNullOrBlank()) {
-                        AsyncImage(
-                            model = job.previewUrl,
-                            contentDescription = job.title,
-                            modifier = Modifier.size(36.dp),
-                            contentScale = ContentScale.Crop,
-                        )
-                    }
-                    Text(
-                        text = buildString {
-                            append(job.title)
-                            append("\n")
-                            append(job.jobKind)
-                            if (!job.device.isNullOrBlank()) {
-                                append(" · ")
-                                append(job.device)
-                            }
-                            append("\n")
-                            append(job.statusLine)
-                        },
-                        style = MaterialTheme.typography.caption2,
-                        color = EazColors.TextPrimary,
-                        modifier = Modifier.weight(1f),
+                    WearActiveJobCard(
+                        title = job.title,
+                        progress = wearJobUiProgress(job.progress, job.saving, job.done),
+                        statusHint = statusHint,
+                        isError = isError,
                     )
                 }
             }
