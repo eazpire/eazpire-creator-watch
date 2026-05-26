@@ -30,6 +30,9 @@ import com.eazpire.creator.core.auth.WearSessionGate
 import com.eazpire.creator.core.device.WearDeviceId
 import com.eazpire.creator.core.i18n.WearTranslationStore
 import com.eazpire.creator.wear.EazColors
+import com.eazpire.creator.wear.auth.bootstrapAuthFromPhone
+import com.eazpire.creator.wear.companion.WearCompanionState
+import com.eazpire.creator.wear.companion.resolveWearCompanionState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -62,9 +65,27 @@ fun WearPairingScreen(
     }
     var state by remember { mutableStateOf<PairUiState>(PairUiState.Loading) }
     var sessionGeneration by remember { mutableIntStateOf(0) }
+    var companionState by remember { mutableStateOf(WearCompanionState.NoPhoneConnected) }
 
     val hintLine1 = translationStore.t("wear.pair_hint_line1", "Scan with Eazpire app")
     val hintLine2 = translationStore.t("wear.pair_hint_line2", "Creator Wear → Connect")
+
+    LaunchedEffect(Unit) {
+        while (true) {
+            if (!WearSessionGate.isSessionReady(context, tokenStore)) {
+                bootstrapAuthFromPhone(context, tokenStore)
+                if (WearSessionGate.isSessionReady(context, tokenStore)) {
+                    onPaired()
+                    break
+                }
+            }
+            companionState = resolveWearCompanionState(
+                context,
+                WearSessionGate.isSessionReady(context, tokenStore),
+            )
+            delay(3000)
+        }
+    }
 
     LaunchedEffect(deviceId, sessionGeneration) {
         state = PairUiState.Loading
@@ -169,6 +190,36 @@ fun WearPairingScreen(
                 textAlign = TextAlign.Center,
                 maxLines = 2,
                 modifier = Modifier.fillMaxWidth(),
+            )
+        }
+        item {
+            val companionHint = when (companionState) {
+                WearCompanionState.NoPhoneConnected -> translationStore.t(
+                    "wear.pair_need_phone",
+                    "Pair an Android phone, then install Eazpire Creator.",
+                )
+                WearCompanionState.PhoneConnectedAppMissing -> translationStore.t(
+                    "wear.pair_need_phone_app",
+                    "Install Eazpire Creator on your phone from Play Store.",
+                )
+                WearCompanionState.PhoneAppInstalledNotLoggedIn -> translationStore.t(
+                    "wear.pair_need_phone_login",
+                    "Open the phone app and sign in.",
+                )
+                WearCompanionState.Ready -> translationStore.t(
+                    "wear.pair_sync_hint",
+                    "Phone app connected — session may sync automatically.",
+                )
+            }
+            Text(
+                text = companionHint,
+                style = MaterialTheme.typography.caption3,
+                color = EazColors.Orange.copy(alpha = 0.9f),
+                textAlign = TextAlign.Center,
+                maxLines = 3,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 6.dp),
             )
         }
     }

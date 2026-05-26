@@ -11,7 +11,8 @@ Creator-only companion for Wear OS (no shop). Synced to `eazpire/eazpire-creator
 
 ## Requirements
 
-- Phone app `com.eazpire.creator` logged in on a paired watch
+- **Non-standalone** companion: phone app `com.eazpire.creator` installed, signed in, paired via Bluetooth
+- Play review: see [docs/setup/WEAR_PLAY_REVIEW.md](../docs/setup/WEAR_PLAY_REVIEW.md)
 - Android Studio or JDK 17 + Android SDK
 
 ## Build
