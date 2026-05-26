@@ -52,26 +52,27 @@ fun WearMainShell(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .wearRoundSafePadding()
-            .pointerInput(currentPage) {
-                var totalDrag = 0f
-                detectHorizontalDragGestures(
-                    onHorizontalDrag = { _, dragAmount -> totalDrag += dragAmount },
-                    onDragEnd = {
-                        when {
-                            totalDrag < -TAB_SWIPE_THRESHOLD_PX && currentPage < PAGE_COUNT - 1 ->
-                                currentPage++
-                            totalDrag > TAB_SWIPE_THRESHOLD_PX && currentPage > 0 ->
-                                currentPage--
-                        }
-                        totalDrag = 0f
-                    },
-                    onDragCancel = { totalDrag = 0f },
-                )
-            },
+            .wearRoundSafePadding(),
     ) {
         Column(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .pointerInput(currentPage) {
+                    var totalDrag = 0f
+                    detectHorizontalDragGestures(
+                        onHorizontalDrag = { _, dragAmount -> totalDrag += dragAmount },
+                        onDragEnd = {
+                            when {
+                                totalDrag < -TAB_SWIPE_THRESHOLD_PX && currentPage < PAGE_COUNT - 1 ->
+                                    currentPage++
+                                totalDrag > TAB_SWIPE_THRESHOLD_PX && currentPage > 0 ->
+                                    currentPage--
+                            }
+                            totalDrag = 0f
+                        },
+                        onDragCancel = { totalDrag = 0f },
+                    )
+                },
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {

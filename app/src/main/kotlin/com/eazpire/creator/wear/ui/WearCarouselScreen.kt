@@ -14,9 +14,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -29,7 +31,8 @@ import androidx.wear.compose.material.MaterialTheme
 import androidx.wear.compose.material.Text
 import coil.compose.AsyncImage
 import com.eazpire.creator.wear.EazColors
-import kotlin.math.abs
+
+private const val CAROUSEL_SWIPE_THRESHOLD_PX = 28f
 
 data class WearCarouselItem(
     val imageUrl: String?,
@@ -66,9 +69,13 @@ fun WearCarouselScreen(
     initialCarouselIndex: Int = 0,
     modifier: Modifier = Modifier,
 ) {
-    var index by remember(filterQuery, initialCarouselIndex) {
-        mutableIntStateOf(initialCarouselIndex.coerceAtLeast(0))
+    var index by remember(filterQuery) { mutableIntStateOf(0) }
+    val latestIndex = rememberUpdatedState(index)
+
+    LaunchedEffect(initialCarouselIndex) {
+        index = initialCarouselIndex.coerceAtLeast(0)
     }
+
     val filtered = remember(items, filterQuery) {
         val q = filterQuery.trim()
         if (q.isBlank()) items
@@ -184,12 +191,22 @@ fun WearCarouselScreen(
                                 Modifier
                             },
                         )
-                        .pointerInput(total, safeIndex) {
-                            detectHorizontalDragGestures { _, drag ->
-                                if (abs(drag) < 28f) return@detectHorizontalDragGestures
-                                if (drag < 0 && safeIndex < total - 1) index++
-                                if (drag > 0 && safeIndex > 0) index--
-                            }
+                        .pointerInput(filterQuery, total) {
+                            var totalDrag = 0f
+                            detectHorizontalDragGestures(
+                                onHorizontalDrag = { _, dragAmount -> totalDrag += dragAmount },
+                                onDragEnd = {
+                                    val idx = latestIndex.value.coerceIn(0, (total - 1).coerceAtLeast(0))
+                                    when {
+                                        totalDrag < -CAROUSEL_SWIPE_THRESHOLD_PX && idx < total - 1 ->
+                                            index = idx + 1
+                                        totalDrag > CAROUSEL_SWIPE_THRESHOLD_PX && idx > 0 ->
+                                            index = idx - 1
+                                    }
+                                    totalDrag = 0f
+                                },
+                                onDragCancel = { totalDrag = 0f },
+                            )
                         },
                     contentAlignment = Alignment.Center,
                 ) {

@@ -7,7 +7,6 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -45,7 +44,6 @@ fun WearProductsScreen(
     var storefrontCache by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
     var searchDraft by remember { mutableStateOf("") }
     var appliedSearch by remember { mutableStateOf("") }
-    var carouselIndex by remember { mutableIntStateOf(0) }
     val fetchingKeys = remember { mutableStateOf(setOf<String>()) }
 
     val displayItems = remember(catalog, mockupCache, storefrontCache) {
@@ -148,7 +146,6 @@ fun WearProductsScreen(
         mockupCache = emptyMap()
         storefrontCache = emptyMap()
         fetchingKeys.value = emptySet()
-        carouselIndex = 0
         loadError = null
         try {
             val loaded = withContext(Dispatchers.IO) { loadWearProductCatalog(api, ownerId) }
@@ -173,12 +170,6 @@ fun WearProductsScreen(
         }
     }
 
-    LaunchedEffect(carouselIndex, appliedSearch, catalog.size, loading) {
-        if (!loading && catalog.isNotEmpty()) {
-            prefetchAround(carouselIndex, displayItems)
-        }
-    }
-
     WearCarouselScreen(
         items = displayItems,
         loading = loading,
@@ -193,11 +184,7 @@ fun WearProductsScreen(
         searchPlaceholder = translationStore.t("wear.search_short", "Search…"),
         showSearch = true,
         productImageMode = true,
-        initialCarouselIndex = carouselIndex,
-        onPageIndexChanged = { index, _ ->
-            carouselIndex = index
-            prefetchAround(index, displayItems)
-        },
+        onPageIndexChanged = { index, _ -> prefetchAround(index, displayItems) },
         modifier = modifier,
     )
 }
