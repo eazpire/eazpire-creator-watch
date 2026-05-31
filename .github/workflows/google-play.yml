@@ -120,8 +120,10 @@ jobs:
           fi
 
       - name: Resolve Wear Play track
+        env:
+          TRACK_INPUT: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.track || vars.PLAY_DEFAULT_TRACK || 'internal' }}
         run: |
-          RAW='${{ github.event_name == 'workflow_dispatch' && github.event.inputs.track || vars.PLAY_DEFAULT_TRACK || 'internal' }}'
+          RAW="$TRACK_INPUT"
           case "$RAW" in
             wear:*) PLAY_TRACK="$RAW" ;;
             *) PLAY_TRACK="wear:$RAW" ;;

@@ -39,6 +39,50 @@ async function getPublisher() {
   return google.androidpublisher({ version: 'v3', auth });
 }
 
+async function getTrackReleases(publisher, packageName, editId, track) {
+  try {
+    const res = await publisher.edits.tracks.get({ packageName, editId, track });
+    return res.data.releases || [];
+  } catch (e) {
+    const msg = String(e.message || e);
+    if (e.code === 404 || msg.includes('not found')) return [];
+    throw e;
+  }
+}
+
+/** Append a release; never replace the whole track (removing in-review versionCodes fails). */
+async function assignVersionToTrack(publisher, packageName, editId, track, versionCode, status) {
+  const existing = await getTrackReleases(publisher, packageName, editId, track);
+  const codeStr = String(versionCode);
+  const already = existing.some((rel) =>
+    (rel.versionCodes || []).map(String).includes(codeStr)
+  );
+  if (already) {
+    console.log(`versionCode ${versionCode} already assigned to ${track}`);
+    return;
+  }
+  const releases = [...existing, { status, versionCodes: [codeStr] }];
+  await publisher.edits.tracks.update({
+    packageName,
+    editId,
+    track,
+    requestBody: { track, releases },
+  });
+  console.log(
+    `Assigned versionCode ${versionCode} to ${track} (${existing.length} existing release(s) kept)`
+  );
+}
+
+function formatPlayApiError(e) {
+  const parts = [e.message || String(e)];
+  const data = e.response?.data;
+  if (data) {
+    if (typeof data === 'string') parts.push(data);
+    else parts.push(JSON.stringify(data));
+  }
+  return parts.join(' — ');
+}
+
 async function uploadNativeSymbols(publisher, packageName, editId, versionCode, symbolsPath) {
   if (!symbolsPath || !fs.existsSync(symbolsPath)) return;
   const data = fs.readFileSync(symbolsPath);
@@ -79,21 +123,14 @@ async function main() {
 
     await uploadNativeSymbols(publisher, opts.package, editId, versionCode, opts.symbols);
 
-    await publisher.edits.tracks.update({
-      packageName: opts.package,
+    await assignVersionToTrack(
+      publisher,
+      opts.package,
       editId,
-      track: opts.track,
-      requestBody: {
-        track: opts.track,
-        releases: [
-          {
-            status: opts.status,
-            versionCodes: [String(versionCode)],
-          },
-        ],
-      },
-    });
-    console.log(`Assigned versionCode ${versionCode} to ${opts.track} only`);
+      opts.track,
+      versionCode,
+      opts.status
+    );
 
     const PHONE = new Set(['internal', 'alpha', 'beta', 'production', 'rollout']);
     const listed = await publisher.edits.tracks.list({ packageName: opts.package, editId });
@@ -130,6 +167,6 @@ async function main() {
 }
 
 main().catch((e) => {
-  console.error(e.message || e);
+  console.error(formatPlayApiError(e));
   process.exit(1);
 });
