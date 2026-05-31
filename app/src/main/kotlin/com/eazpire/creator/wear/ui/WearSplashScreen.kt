@@ -23,7 +23,7 @@ fun WearSplashScreen(modifier: Modifier = Modifier) {
         contentAlignment = Alignment.Center,
     ) {
         Image(
-            painter = painterResource(R.mipmap.ic_launcher),
+            painter = painterResource(R.drawable.ic_eazy_mascot),
             contentDescription = "Eazpire Creator",
             modifier = Modifier.size(48.dp),
         )

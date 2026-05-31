@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- System splash (API 31+): vector only — never @mipmap/ic_launcher (adaptive icon crashes at launch). -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:width="48dp"
+        android:height="48dp"
+        android:drawable="@drawable/ic_eazy_mascot"
+        android:gravity="center" />
+</layer-list>

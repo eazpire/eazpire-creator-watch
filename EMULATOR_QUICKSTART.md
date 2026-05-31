@@ -22,9 +22,23 @@ Modul oben: **`app`** auswählen.
 
 ## Schritt 2: Emulator starten & App installieren
 
-1. **Tools → Device Manager** → **Wear OS XL Round** → ▶ Start  
-2. Grüner **Run**-Button (▶) klicken  
-3. Unten: **Install successfully finished**
+1. **Tools → Device Manager** → **Wear OS XL Round** (oder **Wear OS Large Round**) → ▶ Start  
+   - **Nicht** auf einem Phone-Emulator (Pixel) starten — die Wear-App braucht `android.hardware.type.watch`.
+2. Run-Konfiguration: Modul **`app`**, Gerät = **Wear-Emulator** (nicht `android/` Phone-Projekt).
+3. Grüner **Run**-Button (▶) klicken  
+4. Unten: **Install successfully finished**
+
+### App startet und beendet sich sofort?
+
+| Ursache | Lösung |
+|--------|--------|
+| Phone-Emulator statt Wear | Wear OS Round Emulator verwenden (siehe oben). |
+| Splash-Crash (API 31+) | Adaptive `@mipmap/ic_launcher` im System-Splash crasht — Fix: `@drawable/ic_wear_splash` in `values-v31/themes.xml`. **Rebuild** nach Pull. |
+| Logcat prüfen | Android Studio → Logcat → Filter `com.eazpire.creator.wear`, Level **Error** → Zeile mit `FATAL EXCEPTION`. |
+
+```text
+adb logcat -s AndroidRuntime:E | findstr /i eazpire
+```
 
 ---
 
