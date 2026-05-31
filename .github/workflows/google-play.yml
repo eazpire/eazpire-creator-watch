@@ -162,6 +162,7 @@ jobs:
           if [ -n "${{ steps.native_symbols.outputs.path }}" ]; then
             ARGS="$ARGS --symbols ${{ steps.native_symbols.outputs.path }}"
           fi
+          set -o pipefail
           node scripts/upload-wear-play.js $ARGS
 
       - name: Prune Wear bundles from phone Play tracks

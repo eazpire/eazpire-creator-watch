@@ -40,14 +40,20 @@ async function getPublisher() {
 }
 
 async function getTrackReleases(publisher, packageName, editId, track) {
-  try {
-    const res = await publisher.edits.tracks.get({ packageName, editId, track });
-    return res.data.releases || [];
-  } catch (e) {
-    const msg = String(e.message || e);
-    if (e.code === 404 || msg.includes('not found')) return [];
-    throw e;
-  }
+  const res = await publisher.edits.tracks.list({ packageName, editId });
+  const row = (res.data.tracks || []).find((t) => t.track === track);
+  return row?.releases || [];
+}
+
+/** Play rejects updates if we echo read-only / unknown release fields from list/get. */
+function sanitizeRelease(rel) {
+  const out = {
+    status: rel.status || 'completed',
+    versionCodes: (rel.versionCodes || []).map(String),
+  };
+  if (rel.userFraction != null) out.userFraction = rel.userFraction;
+  if (rel.countryTargeting) out.countryTargeting = rel.countryTargeting;
+  return out;
 }
 
 /** Append a release; never replace the whole track (removing in-review versionCodes fails). */
@@ -61,7 +67,11 @@ async function assignVersionToTrack(publisher, packageName, editId, track, versi
     console.log(`versionCode ${versionCode} already assigned to ${track}`);
     return;
   }
-  const releases = [...existing, { status, versionCodes: [codeStr] }];
+  const newStatus = existing.length > 0 ? 'draft' : status;
+  const releases = [
+    ...existing.map(sanitizeRelease),
+    { status: newStatus, versionCodes: [codeStr] },
+  ];
   await publisher.edits.tracks.update({
     packageName,
     editId,
@@ -69,7 +79,7 @@ async function assignVersionToTrack(publisher, packageName, editId, track, versi
     requestBody: { track, releases },
   });
   console.log(
-    `Assigned versionCode ${versionCode} to ${track} (${existing.length} existing release(s) kept)`
+    `Assigned versionCode ${versionCode} to ${track} as ${newStatus} (${existing.length} existing release(s) kept)`
   );
 }
 
@@ -167,6 +177,8 @@ async function main() {
 }
 
 main().catch((e) => {
-  console.error(formatPlayApiError(e));
+  const msg = formatPlayApiError(e);
+  console.error(msg);
+  console.error(`::error::${msg.replace(/[\r\n]+/g, ' ').slice(0, 500)}`);
   process.exit(1);
 });
