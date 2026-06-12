@@ -64,6 +64,7 @@ fun WearDesignLibraryActionsHost(
     var errorText by remember { mutableStateOf<String?>(null) }
     var creatorNames by remember { mutableStateOf<List<String>>(emptyList()) }
     var selectedCreator by remember { mutableStateOf<String?>(null) }
+    var activateWithoutCreator by remember { mutableStateOf(false) }
 
     val hasDesignId = designId.isNotBlank()
     val isActive = hasDesignId && (activityFilter == "active" || design.libraryStatus == "active")
@@ -74,12 +75,17 @@ fun WearDesignLibraryActionsHost(
         if (!res.optBoolean("ok", false)) return emptyList()
         val settings = res.optJSONObject("settings") ?: res
         val arr = settings.optJSONArray("creator_names") ?: JSONArray()
-        return buildList {
+        val out = buildList {
             for (i in 0 until arr.length()) {
                 val n = arr.optString(i, "").trim()
                 if (n.isNotBlank()) add(n)
             }
-        }.distinct()
+        }.toMutableList()
+        val primary = settings.optString("creator_name", "").trim()
+        if (primary.isNotBlank() && out.none { it.equals(primary, ignoreCase = true) }) {
+            out.add(0, primary)
+        }
+        return out.distinct()
     }
 
     suspend fun runDelete() {
@@ -161,7 +167,7 @@ fun WearDesignLibraryActionsHost(
         }
     }
 
-    suspend fun runActivate(creatorName: String) {
+    suspend fun runActivate(creatorName: String, activateWithoutCreator: Boolean = false) {
         if (!hasDesignId) return
         busy = true
         errorText = null
@@ -170,7 +176,12 @@ fun WearDesignLibraryActionsHost(
                 .put("design_id", designId)
                 .put("library_status", "active")
                 .put("visibility", "public")
-                .put("creator_name", creatorName)
+            if (activateWithoutCreator) {
+                body.put("activate_without_creator_name", true)
+                body.put("creator_name", "")
+            } else {
+                body.put("creator_name", creatorName)
+            }
             val upd = withContext(Dispatchers.IO) { api.updateDesign(ownerId, body) }
             if (!upd.optBoolean("ok", false)) {
                 errorText = formatWearApiError(
@@ -199,12 +210,12 @@ fun WearDesignLibraryActionsHost(
                 creatorNames = names
                 when {
                     names.isEmpty() -> {
-                        errorText = translationStore.t(
-                            "wear.design_no_creator",
-                            "No creator name configured.",
-                        )
+                        activateWithoutCreator = true
+                        selectedCreator = null
+                        phase = WearDesignActionPhase.CONFIRM_ACTIVATE
                     }
                     names.size == 1 -> {
+                        activateWithoutCreator = false
                         selectedCreator = names[0]
                         phase = WearDesignActionPhase.CONFIRM_ACTIVATE
                     }
@@ -368,21 +379,33 @@ fun WearDesignLibraryActionsHost(
 
                 WearDesignActionPhase.CONFIRM_ACTIVATE -> {
                     val name = selectedCreator.orEmpty()
-                    Text(
-                        text = translationStore.t(
+                    val confirmText = if (activateWithoutCreator) {
+                        translationStore.t(
+                            "wear.design_activate_no_creator_confirm",
+                            "Activate without creator name?",
+                        )
+                    } else {
+                        translationStore.t(
                             "wear.design_activate_creator_confirm",
                             "Activate as {{creator}}?",
-                        ).replace("{{creator}}", name),
+                        ).replace("{{creator}}", name)
+                    }
+                    Text(
+                        text = confirmText,
                         style = MaterialTheme.typography.caption2,
                         textAlign = TextAlign.Center,
                     )
                     WearTriangleIconActions(
                         topStart = {
                             WearIconCircleButton(
-                                onClick = { scope.launch { runActivate(name) } },
+                                onClick = {
+                                    scope.launch {
+                                        runActivate(name, activateWithoutCreator)
+                                    }
+                                },
                                 icon = "✓",
                                 contentDescription = translationStore.t("wear.confirm", "Confirm"),
-                                enabled = !busy && name.isNotBlank(),
+                                enabled = !busy && (activateWithoutCreator || name.isNotBlank()),
                             )
                         },
                         topEnd = {
