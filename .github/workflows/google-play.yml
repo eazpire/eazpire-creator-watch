@@ -1,6 +1,6 @@
 # Signiertes AAB → Google Play (Wear app com.eazpire.creator.wear)
 #
-# Aktivierung (Repo eazpire-creator-wear):
+# Aktivierung (Repo eazpire-creator-watch):
 #   Variable ENABLE_GOOGLE_PLAY = true
 #   Optional PLAY_DEFAULT_TRACK (wear:internal | wear:alpha | …), PLAY_VERSION_CODE_BASE (optional offset; default 2 + run_number)
 #   Wear bundles must use wear:* tracks, not phone "internal" — see Play Console Advanced settings → Wear OS track.

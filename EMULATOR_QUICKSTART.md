@@ -13,7 +13,7 @@ Die App heißt **Eazpire Creator** und hat dunklen Hintergrund + orange Tabs ode
 In Android Studio **diesen Ordner** öffnen (nicht nur `android`):
 
 ```
-…/creator-worker/wear
+…/eazpire/creator-watch
 ```
 
 Modul oben: **`app`** auswählen.
@@ -64,7 +64,7 @@ Nach Run zeigt der Emulator oft noch das **Zifferblatt**. Dann:
 
 ```powershell
 cd "C:\Users\tobim\OneDrive\Dokumente\Cursor Projects\creator-worker"
-npm run wear:run-emulator
+npm run creator-watch:run-emulator
 ```
 
 Startet die App direkt auf dem laufenden Emulator.
@@ -73,18 +73,18 @@ Startet die App direkt auf dem laufenden Emulator.
 
 ## Build-Fehler `packageDebug` / NullPointerException
 
-Ursache war oft **OneDrive-Sperre** auf `wear/*/build` oder kaputte Zwischenstände.
+Ursache war oft **OneDrive-Sperre** auf `creator-watch/*/build` oder kaputte Zwischenstände.
 
 **Fix im Projekt:** Builds landen lokal unter  
-`%LOCALAPPDATA%\eazpire-wear-build\` (nicht im OneDrive-Ordner).
+`%LOCALAPPDATA%\eazpire-creator-watch-build\` (nicht im OneDrive-Ordner).
 
 Wenn es in Android Studio noch scheitert:
 
 1. **Build → Clean Project**, dann **Rebuild**
-2. Oder Terminal: `cd wear` → `.\gradlew.bat --stop` → `.\gradlew.bat :app:assembleDebug`
+2. Oder Terminal: `cd creator-watch` → `.\gradlew.bat --stop` → `.\gradlew.bat :app:assembleDebug`
 3. Bei „Unable to delete directory“: Android Studio kurz schließen, Befehl erneut ausführen
 
-Debug-APK: `%LOCALAPPDATA%\eazpire-wear-build\app\outputs\apk\debug\app-debug.apk`
+Debug-APK: `%LOCALAPPDATA%\eazpire-creator-watch-build\app\outputs\apk\debug\app-debug.apk`
 
 ## Nur ein kleiner Streifen oben („Eazpire Creator“) + Uhr?
 
@@ -94,7 +94,7 @@ Debug-APK: `%LOCALAPPDATA%\eazpire-wear-build\app\outputs\apk\debug\app-debug.ap
 
 ```powershell
 adb uninstall com.eazpire.creator.wear
-cd wear
+cd creator-watch
 .\gradlew.bat :app:installDebug
 adb shell am start -n com.eazpire.creator.wear/.MainActivity
 ```
