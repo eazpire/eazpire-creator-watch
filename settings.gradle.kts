@@ -16,6 +16,6 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "eazpire-creator-wear"
+rootProject.name = "eazpire-creator-watch"
 include(":app")
 include(":creator-core")

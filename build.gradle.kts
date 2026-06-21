@@ -10,6 +10,6 @@ subprojects {
     if (System.getenv("CI") != "true") {
         val localRoot = System.getenv("LOCALAPPDATA") ?: System.getProperty("java.io.tmpdir")
         val safeName = path.removePrefix(":").replace(":", "_")
-        layout.buildDirectory.set(file("$localRoot/eazpire-wear-build/$safeName"))
+        layout.buildDirectory.set(file("$localRoot/eazpire-creator-watch-build/$safeName"))
     }
 }

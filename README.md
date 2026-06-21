@@ -1,6 +1,6 @@
-# Eazpire Creator — Wear OS
+# Eazpire Creator Watch (Wear OS)
 
-Creator-only companion for Wear OS (no shop). Synced to `eazpire/eazpire-creator-wear` for Google Play releases.
+Creator-only companion for Wear OS (no shop). Synced to `eazpire/eazpire-creator-watch` for Google Play releases.
 
 ## Features (MVP)
 
@@ -12,20 +12,20 @@ Creator-only companion for Wear OS (no shop). Synced to `eazpire/eazpire-creator
 ## Requirements
 
 - **Non-standalone** companion: phone app `com.eazpire.creator` installed, signed in, paired via Bluetooth
-- Play review: see [docs/setup/WEAR_PLAY_REVIEW.md](../docs/setup/WEAR_PLAY_REVIEW.md)
+- Play review: see [docs/setup/CREATOR_WATCH_PLAY_REVIEW.md](../docs/setup/CREATOR_WATCH_PLAY_REVIEW.md)
 - Android Studio or JDK 17 + Android SDK
 
 ## Build
 
 ```bash
-cd wear
+cd creator-watch
 ./gradlew assembleDebug
 ```
 
-From repo root: `npm run wear:build` or `npm run wear:run-emulator`
+From repo root: `npm run creator-watch:build` or `npm run creator-watch:run-emulator`
 
-On Windows, outputs go to `%LOCALAPPDATA%\eazpire-wear-build\` (avoids OneDrive file locks and `packageDebug` NPE). See `EMULATOR_QUICKSTART.md`.
+On Windows, outputs go to `%LOCALAPPDATA%\eazpire-creator-watch-build\` (avoids OneDrive file locks). See `EMULATOR_QUICKSTART.md`.
 
 ## Setup & Play
 
-See [docs/setup/WEAR_REPO_SETUP.md](../docs/setup/WEAR_REPO_SETUP.md).
+See [docs/setup/CREATOR_WATCH_REPO_SETUP.md](../docs/setup/CREATOR_WATCH_REPO_SETUP.md).
