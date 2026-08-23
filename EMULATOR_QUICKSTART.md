@@ -1,5 +1,7 @@
 # Wear-App im Emulator testen (3 Schritte)
 
+**Kein Publish-Weg.** Releases gehen über GitHub Actions nach Google Play (`docs/setup/ANDROID_PLAY_PUBLISH.md`). Dieser Guide ist nur optionales lokales Debugging.
+
 ## Wichtig
 
 **Die Uhrzeit auf dem runden Display = System-Zifferblatt, nicht unsere App.**
